@@ -22,8 +22,9 @@ from thonny.plugins.codelive.user import User, UserEncoder, UserDecoder
 from thonny.plugins.codelive.views.session_status.dialog import SessionDialog
 
 MSGLEN = 2048
-SOCK_ADDR = ('localhost', 8000)
+
 WORKBENCH = get_workbench()
+DEBUG = False
 
 class Session:
 
@@ -36,7 +37,7 @@ class Session:
                  users = None,
                  is_host = False,
                  is_cohost = False,
-                 debug = True):
+                 debug = DEBUG):
 
         self._users = users if users else dict()
         self.username = name if name != None else ("Host" if is_host else "Client")
@@ -49,11 +50,11 @@ class Session:
         self._shared_editors = {"id_first": dict(), "ed_first": dict(), "txt_first": dict()} \
                                     if shared_editors == None \
                                     else self._enumerate_s_ed(shared_editors)
-        print("enumerated")
+
         # Network handles
         self._connection = cmqtt.MqttConnection(self, broker_url=broker, topic = topic)
         self._network_lock = threading.Lock()
-        print("connected")
+
         # client privilage flags
         self.is_host = is_host
         self.is_cohost = is_cohost
@@ -70,11 +71,7 @@ class Session:
         # self._cursor_blink_thread = threading.Thread(target=self._cursor_blink, daemon=True)
         
         # bindings
-        self.bind_event(WORKBENCH, "RemoteChange", self.apply_remote_changes)
-        self.bind_event(WORKBENCH, "MakeDriver", self.request_give)
-        self.bind_locals()
-        self.bind_cursor_callbacks()
-        print("events bound")
+        self.bind_all(debug)
 
         self.initialized = False
         
@@ -141,6 +138,41 @@ class Session:
 
         if debug:
             print("  Done. Binding_id:", binding["handler"] if "handler" in binding else binding["id"])
+
+    def bind_locals(self, debug = False):
+        '''
+        Bind keypress binds the events from components with callbacks. The function keys 
+        associated with the bindings are returned as values of a dictionary whose keys are string of
+        the event sequence and the widget's name separated by a "|"
+
+        If the event is bound to a widget, the name of the widget is "editor_<the editor's assigned id>". 
+        '''
+        for widget in self._shared_editors["txt_first"]:
+            self.bind_event(widget, "<KeyPress>", self.broadcast_keypress, True, debug)
+        
+        self.bind_event(get_workbench(), "LocalInsert", self.broadcast_insert, True, debug)
+        self.bind_event(get_workbench(), "LocalDelete", self.broadcast_delete, True, debug)
+
+    def bind_cursor_callbacks(self, debug = False):
+
+        for text_widget in self._shared_editors["txt_first"]:
+            
+            self.bind_event(text_widget, "<KeyRelease-Left>", self.boradcast_cursor_motion, True, debug)
+            self.bind_event(text_widget, "<KeyRelease-Right>", self.boradcast_cursor_motion, True, debug)
+            self.bind_event(text_widget, "<KeyRelease-Up>", self.boradcast_cursor_motion, True, debug)
+            self.bind_event(text_widget, "<KeyRelease-Down>", self.boradcast_cursor_motion, True, debug)
+            self.bind_event(text_widget, "<KeyRelease-Return>", self.boradcast_cursor_motion, True, debug)
+            self.bind_event(text_widget, "<ButtonRelease-1>", self.boradcast_cursor_motion, True, debug)
+    
+    def bind_all(self, debug = False):
+        if debug:
+            print("Binding All events")
+        self.bind_event(WORKBENCH, "RemoteChange", self.apply_remote_changes, debug)
+        self.bind_event(WORKBENCH, "MakeDriver", self.request_give, debug)
+        self.bind_locals(debug)
+        self.bind_cursor_callbacks(debug)
+        if debug:
+            print("Done")
 
     def unbind_all(self, debug = False):
         if debug:
@@ -313,21 +345,6 @@ class Session:
             widget.insert = types.MethodType(pc.patched_insert, widget)
             widget.delete = types.MethodType(pc.patched_delete, widget)
     
-    # For all
-    def bind_locals(self):
-        '''
-        Bind keypress binds the events from components with callbacks. The function keys 
-        associated with the bindings are returned as values of a dictionary whose keys are string of
-        the event sequence and the widget's name separated by a "|"
-
-        If the event is bound to a widget, the name of the widget is "editor_<the editor's assigned id>". 
-        '''
-        for widget in self._shared_editors["txt_first"]:
-            self.bind_event(widget, "<KeyPress>", self.broadcast_keypress, True)
-        
-        self.bind_event(get_workbench(), "LocalInsert", self.broadcast_insert, True)
-        self.bind_event(get_workbench(), "LocalDelete", self.broadcast_delete, True)
-
     def _cursor_blink(self):
         '''
         Runs of a daemon thread to show a remote user's pseudo-cursor...
@@ -403,17 +420,6 @@ class Session:
             print("in broadcast: -%s-" % instr)
 
         self.send(instr)
-    
-    def bind_cursor_callbacks(self):
-
-        for text_widget in self._shared_editors["txt_first"]:
-            
-            self.bind_event(text_widget, "<KeyRelease-Left>", self.boradcast_cursor_motion, True)
-            self.bind_event(text_widget, "<KeyRelease-Right>", self.boradcast_cursor_motion, True)
-            self.bind_event(text_widget, "<KeyRelease-Up>", self.boradcast_cursor_motion, True)
-            self.bind_event(text_widget, "<KeyRelease-Down>", self.boradcast_cursor_motion, True)
-            self.bind_event(text_widget, "<KeyRelease-Return>", self.boradcast_cursor_motion, True)
-            self.bind_event(text_widget, "<ButtonRelease-1>", self.boradcast_cursor_motion, True)
 
     def enable_editing(self):
         for text_widget in self._shared_editors["txt_first"]:
