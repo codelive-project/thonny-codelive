@@ -241,7 +241,7 @@ class MqttConnection(mqtt_client.Client):
 
     def respond_to_handshake(self, sender_id, reply_url, name):
         
-        assigned_id = utils.get_new_id()
+        assigned_id = self.session.get_new_user_id()
         def get_unique_name(_name):
             name_list = [user.name for user in self.session.get_active_users(False)]
             if _name not in name_list:

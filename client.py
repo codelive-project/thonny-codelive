@@ -29,21 +29,24 @@ DEBUG = False
 
 class Session:
 
-    def __init__(self, 
+    def __init__(self,
+                 is_host,
                  _id = -1,
                  name = None,
                  topic = None,
                  broker = None,
                  shared_editors = None,
                  users = None,
-                 is_host = False,
-                 is_cohost = False,
                  debug = DEBUG):
         self._debug = debug
         self._users = users if users else dict()
         self.username = name if name != None else ("Host" if is_host else "Client")
-        self.user_id = _id if _id != -1 else utils.get_new_id()
-        self._used_ids = []
+        self.user_id = _id
+        if _id == -1:
+            if is_host == True:
+                self.user_id = 0
+            else:
+                raise ValueError("Please provide id")
         self._bind_hashes = {}
 
         # UI handles
@@ -58,7 +61,6 @@ class Session:
 
         # client privilage flags
         self.is_host = is_host
-        self.is_cohost = is_cohost
 
         self.user_man = \
             userManMqtt.MqttUserManagement(self._connection.session,
@@ -91,8 +93,7 @@ class Session:
 
     @classmethod
     def create_session(cls, name, topic, broker = None, shared_editors = None, debug = False):
-        return Session(_id = utils.get_new_id(),
-                       name = name,
+        return Session(name = name,
                        topic = topic,
                        broker = broker or cmqtt.get_default_broker(),
                        shared_editors = shared_editors,
@@ -106,7 +107,8 @@ class Session:
         shared_editors = utils.intiialize_documents(current_state["docs"])
         users = {user.id : user for user in current_state["users"]}
 
-        return Session(_id = current_state["id_assigned"],
+        return Session(is_host= False,
+                       _id = current_state["id_assigned"],
                        name = current_state["name"],
                        topic = topic,
                        broker = broker,
@@ -187,8 +189,8 @@ class Session:
     def bind_all(self, debug = False):
         if debug:
             print("Binding All events")
-        self.bind_event(WORKBENCH, "RemoteChange", self.apply_remote_changes, debug)
-        self.bind_event(WORKBENCH, "MakeDriver", self.request_give, debug)
+        self.bind_event(WORKBENCH, "RemoteChange", self.apply_remote_changes, True, debug)
+        self.bind_event(WORKBENCH, "MakeDriver", self.request_give, True, debug)
         self.bind_locals(debug)
         self.bind_cursor_callbacks(debug)
         self.bind_special_keys(debug)
@@ -333,6 +335,16 @@ class Session:
                 if i != existing[i]:
                     return i
             return len(existing)
+    
+    def get_new_user_id(self):
+        if self._users == None:
+            return 0
+        else:
+            existing = sorted(self._users.keys())
+            for i in range(len(existing)):
+                if i != existing[i]:
+                    return i
+            return len(existing)
 
     def get_docs(self):
         json_form = dict()
@@ -446,7 +458,7 @@ class Session:
         editor_id = self.e_id_from_text(event.widget)
 
         # if text was selected, delete the selection before inserting
-        try:
+        if text_widget.tag_ranges("sel"):
             sel_start = text_widget.index("sel.first")
             sel_end = text_widget.index("sel.last")
 
@@ -454,8 +466,6 @@ class Session:
             if self._debug:
                 print("Deleting selection")
             self.send(del_instr)
-        except TclError:
-            pass
         
         instr = utils.get_direct_instr(event, editor_id, self.user_id, 
                                 sel_start, False)
