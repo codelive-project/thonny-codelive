@@ -20,6 +20,7 @@ import thonny.plugins.codelive.user_management as userManMqtt
 
 from thonny.plugins.codelive.user import User, UserEncoder, UserDecoder
 from thonny.plugins.codelive.views.session_status.dialog import SessionDialog
+from thonny.ui_utils import select_sequence
 
 MSGLEN = 2048
 
@@ -38,7 +39,7 @@ class Session:
                  is_host = False,
                  is_cohost = False,
                  debug = DEBUG):
-
+        self._debug = debug
         self._users = users if users else dict()
         self.username = name if name != None else ("Host" if is_host else "Client")
         self.user_id = _id if _id != -1 else utils.get_new_id()
@@ -81,9 +82,6 @@ class Session:
         self.replace_insert_delete()
         self._add_self(is_host)
 
-        self._debug = debug
-        print("methods replaced")
-
         if is_host:
             self.enable_editing()
         else:
@@ -117,8 +115,7 @@ class Session:
     
     def bind_event(self, widget, seq, handler, override = True, debug = False):
         if debug:
-            print("Binding Widget: %s to seq: %s with handler: %s..." %
-                    (str(widget), str(seq), str(handler)))
+            print("Binding Widget: %s to seq: %s..." % (str(widget), str(seq)))
         binding = None
         if widget == get_workbench():
             widget.bind(seq, handler, override)
@@ -137,7 +134,7 @@ class Session:
                 self._bind_hashes[widget] = [binding]
 
         if debug:
-            print("  Done. Binding_id:", binding["handler"] if "handler" in binding else binding["id"])
+            print("  Done.")
 
     def bind_locals(self, debug = False):
         '''
@@ -154,16 +151,39 @@ class Session:
         self.bind_event(get_workbench(), "LocalDelete", self.broadcast_delete, True, debug)
 
     def bind_cursor_callbacks(self, debug = False):
+        seqs = [
+            "<KeyRelease-Left>",
+            "<KeyRelease-Right>",
+            "<KeyRelease-Up>",
+            "<KeyRelease-Down>",
+            "<KeyRelease-Return>",
+            "<ButtonRelease-1>",
+        ]
+        if debug:
+            print("Binding Special keys...")
+        for text_widget in self._shared_editors["txt_first"]:
+            for seq in seqs:
+                self.bind_event(text_widget, seq, self.boradcast_cursor_motion, True, debug)
+        if debug:
+            print("Done")
+
+    def bind_special_keys(self, debug = False):
+        seqs = [
+            "<KeyRelease-Meta_L>",
+            "<KeyRelease-Super_L>",
+            "<KeyRelease-Control_L>",
+            "<KeyRelease-Alt_L>",
+            select_sequence("<Control-s>", "<Command-s>"),
+            select_sequence("<Control-x>", "<Command-x>"),
+            select_sequence("<Control-z>", "<Command-z>"),
+            select_sequence("<Control-v>", "<Command-v>"),
+            select_sequence("<Control-Shift-z>", "<Command-Shift-z>"),
+        ]
 
         for text_widget in self._shared_editors["txt_first"]:
-            
-            self.bind_event(text_widget, "<KeyRelease-Left>", self.boradcast_cursor_motion, True, debug)
-            self.bind_event(text_widget, "<KeyRelease-Right>", self.boradcast_cursor_motion, True, debug)
-            self.bind_event(text_widget, "<KeyRelease-Up>", self.boradcast_cursor_motion, True, debug)
-            self.bind_event(text_widget, "<KeyRelease-Down>", self.boradcast_cursor_motion, True, debug)
-            self.bind_event(text_widget, "<KeyRelease-Return>", self.boradcast_cursor_motion, True, debug)
-            self.bind_event(text_widget, "<ButtonRelease-1>", self.boradcast_cursor_motion, True, debug)
-    
+            for seq in seqs:
+                self.bind_event(text_widget, seq, self.handle_special_keys, True, debug)
+
     def bind_all(self, debug = False):
         if debug:
             print("Binding All events")
@@ -171,6 +191,7 @@ class Session:
         self.bind_event(WORKBENCH, "MakeDriver", self.request_give, debug)
         self.bind_locals(debug)
         self.bind_cursor_callbacks(debug)
+        self.bind_special_keys(debug)
         if debug:
             print("Done")
 
@@ -315,14 +336,14 @@ class Session:
 
     def get_docs(self):
         json_form = dict()
-        print("jeu:", json_form)
         for editor in self._shared_editors["ed_first"]:
             content = editor.get_text_widget().get("0.0", tk.END)
-            content = content[: -1] if len(content) >= 1 else content # remove needles \n at the end of file
+            # remove needles \n at the end of file
+            if len(content) >= 1:
+                content = content[: -1]
 
             temp = {"title": editor.get_title(),
                     "content": content}
-            print(temp)
             json_form[self.id_from_editor(editor)] = temp
         
         return json_form
@@ -364,7 +385,7 @@ class Session:
 
     def send(self, msg = None):
         self._connection.publish(msg)
-    
+
     def boradcast_cursor_motion(self, event):
         if event.widget.is_read_only():
             return
@@ -378,10 +399,21 @@ class Session:
         }
         self.send(instr)
     
+    def handle_special_keys(self, event):
+        SYNC_DELAY_MS = 1000
+        text_widget = event.widget
+        
+        if text_widget.is_read_only():
+            return
+        
+        _id = self.e_id_from_text(event.widget)
+        
+        WORKBENCH.after(SYNC_DELAY_MS, self.sync_docs, _id)
+
     def broadcast_insert(self, event):
         editor = WORKBENCH.get_editor_notebook().get_current_editor()
         editor_id = self.id_from_editor(editor)
-        instr = utils.get_instr_latent(event, editor_id, True, user_id = self.user_id)
+        instr = utils.get_latent_instr(event, editor_id, True, user_id = self.user_id)
 
         if instr == None:
             return
@@ -393,7 +425,7 @@ class Session:
     def broadcast_delete(self, event):
         editor = WORKBENCH.get_editor_notebook().get_current_editor()
         editor_id = self.id_from_editor(editor)
-        instr = utils.get_instr_latent(event, editor_id, False, user_id = self.user_id)
+        instr = utils.get_latent_instr(event, editor_id, False, user_id = self.user_id)
 
         if instr == None:
             return
@@ -407,11 +439,26 @@ class Session:
         text_widget = event.widget
         
         if text_widget.is_read_only():
+            text_widget.bell()
             return
         
+        sel_start = text_widget.index(tk.INSERT)
         editor_id = self.e_id_from_text(event.widget)
-        instr = utils.get_instr_direct(event, editor_id, self.user_id, 
-                                text_widget.index(tk.INSERT), False)
+
+        # if text was selected, delete the selection before inserting
+        try:
+            sel_start = text_widget.index("sel.first")
+            sel_end = text_widget.index("sel.last")
+
+            del_instr = utils.del_selection_instr(sel_start, sel_end, editor_id, self.user_id, self._debug)
+            if self._debug:
+                print("Deleting selection")
+            self.send(del_instr)
+        except TclError:
+            pass
+        
+        instr = utils.get_direct_instr(event, editor_id, self.user_id, 
+                                sel_start, False)
         
         if instr == None:
             return
@@ -445,6 +492,19 @@ class Session:
         
         return -1, "null"
     
+    def sync_docs(self, _id):
+        text_widget = self.text_widget_from_id(_id)
+        instr = utils.get_sync_instr(text_widget, _id, self.user_id,
+                                     text_widget.index(tk.INSERT), self._debug)
+        
+        if instr == None:
+            return
+
+        if self._debug:
+            print("in broadcast: -%s-" % instr)
+
+        self.send(instr)
+
     def change_host(self, user_id = None):
         if user_id == self.user_id:
             self.be_host()
@@ -521,6 +581,12 @@ class Session:
                 tk.Text.delete(widget, msg["start"])
             widget.set_read_only(True)
         
+        elif msg["type"] == "S":
+            widget.set_read_only(False)
+            tk.Text.delete(widget, "0.0", tk.END)
+            tk.Text.insert(widget, "0.0", msg["text"])
+            widget.set_read_only(True)
+
         elif msg["type"] == "M":
             # user_id = msg["user"]
             # doc_id = msg["doc"]
