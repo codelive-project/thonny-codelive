@@ -16,7 +16,7 @@ ALL_REGEX = re.compile("[a-zA-Z0-9 ./<>?;:\"\'`!@#$%^&*()\[\]{}_+=|(\\)-,~]")
 MIN_FREE_ID = 0
 FREE_IDS = []
 
-def get_sync_instr(text, doc_id, user_id = -1, cursor_pos = "", debug = False):
+def get_sync_instr(text, doc_id, user_id, cursor_pos, debug = False):
     if debug:
         print("Getting Sync Instr")
     
@@ -29,7 +29,7 @@ def get_sync_instr(text, doc_id, user_id = -1, cursor_pos = "", debug = False):
     instr["doc"] = doc_id
     instr["text"] = text.get("0.0", tk.END)
 
-    # remove needles \n at the end of file
+    # remove needles "\n" at the end of file
     if len(instr["text"]) >= 1:
         instr["text"] = instr["text"][:-1]
 
@@ -37,7 +37,7 @@ def get_sync_instr(text, doc_id, user_id = -1, cursor_pos = "", debug = False):
         print(instr)
     return instr
 
-def get_direct_instr(event, editor_id, user_id = -1, cursor_pos = "", debug = False):
+def get_direct_instr(event, editor_id, user_id, cursor_pos, debug = False):
     if debug:
         print("Getting Direct Instr")
     
@@ -79,7 +79,7 @@ def get_direct_instr(event, editor_id, user_id = -1, cursor_pos = "", debug = Fa
         print(instr)
     return instr
 
-def get_latent_instr(event, editor_id, is_insert, user_id = -1, debug = False):
+def get_latent_instr(event, editor_id, is_insert, user_id, debug = False):
     if debug:
         print("Getting latent instr")
     instr = dict()

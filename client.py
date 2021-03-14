@@ -581,6 +581,7 @@ class Session:
 
             widget.set_read_only(False)
             tk.Text.insert(widget, pos, new_text)
+            widget.see(msg["user_pos"])
             widget.set_read_only(True)
         
         elif msg["type"] == "D":
@@ -595,6 +596,7 @@ class Session:
             widget.set_read_only(False)
             tk.Text.delete(widget, "0.0", tk.END)
             tk.Text.insert(widget, "0.0", msg["text"])
+            widget.see(msg["user_pos"])
             widget.set_read_only(True)
 
         elif msg["type"] == "M":
