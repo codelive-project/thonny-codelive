@@ -125,9 +125,11 @@ class MqttConnection(mqtt_client.Client):
         
         if topic == None:
             self.topic = generate_topic()
-            print("New Topic: %s" % self.topic)
+            if self.session._debug:
+                print("New Topic: %s" % self.topic)
         else:
-            print("Existing topic: %s" % self.topic)
+            if self.session._debug:
+                print("Existing topic: %s" % self.topic)
 
     @classmethod
     def handshake(cls, name, topic, broker):
@@ -200,7 +202,9 @@ class MqttConnection(mqtt_client.Client):
             return
 
         json_msg = json.loads(msg.payload, cls = UserDecoder)
-        print(json_msg)
+
+        if self.session._debug:
+            print(json_msg)
         try:
             sender_id = get_sender_id(json_msg)
             instr = get_instr(json_msg)
@@ -208,7 +212,8 @@ class MqttConnection(mqtt_client.Client):
             print("WARNING: missing instr/sender id")
 
         if sender_id == self.session.user_id:
-            print("instr ignored")
+            if self.session._debug:
+                print("instr ignored")
             return
 
         # on join request
@@ -216,7 +221,7 @@ class MqttConnection(mqtt_client.Client):
             self.respond_to_handshake(sender_id, instr["reply"], instr["name"])
         
         # on edit
-        elif instr["type"] in ("I", "D", "M"):
+        elif instr["type"] in ("I", "D", "S", "M"):
             WORKBENCH.event_generate("RemoteChange", change=instr)
         
         # On new user signal only sent by host 
@@ -236,7 +241,7 @@ class MqttConnection(mqtt_client.Client):
 
     def respond_to_handshake(self, sender_id, reply_url, name):
         
-        assigned_id = utils.get_new_id()
+        assigned_id = self.session.get_new_user_id()
         def get_unique_name(_name):
             name_list = [user.name for user in self.session.get_active_users(False)]
             if _name not in name_list:
@@ -258,7 +263,8 @@ class MqttConnection(mqtt_client.Client):
                                       hostname=self.broker)
 
     def addressed_msg(self, msg):
-        print("in addressed")
+        if self.session._debug:
+            print("in addressed")
         json_msg = json.loads(msg, cls=UserDecoder)
 
         instr = json_msg["instr"]

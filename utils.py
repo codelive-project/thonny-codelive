@@ -16,9 +16,30 @@ ALL_REGEX = re.compile("[a-zA-Z0-9 ./<>?;:\"\'`!@#$%^&*()\[\]{}_+=|(\\)-,~]")
 MIN_FREE_ID = 0
 FREE_IDS = []
 
-def get_instr_direct(event, editor_id, user_id = -1, cursor_pos = "", in_insert = False, debug = False):
+def get_sync_instr(text, doc_id, user_id = -1, cursor_pos = "", debug = False):
     if debug:
-        print("direct")
+        print("Getting Sync Instr")
+    
+    instr = dict()
+
+    instr["type"] = "S"
+    instr["num"] = random.randint(0, 100000)
+    instr["user"] = user_id
+    instr["user_pos"] = cursor_pos
+    instr["doc"] = doc_id
+    instr["text"] = text.get("0.0", tk.END)
+
+    # remove needles \n at the end of file
+    if len(instr["text"]) >= 1:
+        instr["text"] = instr["text"][:-1]
+
+    if debug:
+        print(instr)
+    return instr
+
+def get_direct_instr(event, editor_id, user_id = -1, cursor_pos = "", debug = False):
+    if debug:
+        print("Getting Direct Instr")
     
     instr = dict()
     text = event.widget
@@ -58,8 +79,9 @@ def get_instr_direct(event, editor_id, user_id = -1, cursor_pos = "", in_insert 
         print(instr)
     return instr
 
-def get_instr_latent(event, editor_id, is_insert, user_id = -1, debug = False):
-    print("latent")
+def get_latent_instr(event, editor_id, is_insert, user_id = -1, debug = False):
+    if debug:
+        print("Getting latent instr")
     instr = dict()
 
     if is_insert:
@@ -84,7 +106,20 @@ def get_instr_latent(event, editor_id, is_insert, user_id = -1, debug = False):
         if user_id != -1 and instr != None:
             instr["user"] = user_id
             instr["user_pos"] = event.cursor_after_change
-            instr["doc"] = editor_id    
+            instr["doc"] = editor_id
+    return instr
+
+def del_selection_instr(start, end, doc_id, user_id, debug = False):
+    instr = dict()
+    
+    instr["type"] = "D"
+    instr["num"] = random.randint(0, 100000)
+    instr["start"] = start
+    instr["end"] = end
+    instr["user"] = user_id
+    instr["user_pos"] = start
+    instr["doc"] = doc_id
+
     return instr
 
 def get_new_id():
