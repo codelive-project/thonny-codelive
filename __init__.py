@@ -26,6 +26,26 @@ session = None
 
 DEBUG = True
 
+def cleanup(event):
+    global session
+    session = None
+    msg = None
+    if event.remote:
+        if event.end:
+            msg = "Session ended by acting host."
+        else:
+            msg = "You were removed by the acting host."
+    else:
+        if event.end:
+            msg = "Session Ended."
+        else:
+            msg = "Session " + ("Ended." if event.end else "Left.")
+
+    tk.messagebox.showinfo(parent = get_workbench(),
+                           title = "Session Ended",
+                           message = msg)
+    get_workbench().unbind("CoLiveSessionEnd", cleanup)
+
 def create_session_vanilla(data = None):
     global session
     data_session = data or {
@@ -39,7 +59,8 @@ def create_session_vanilla(data = None):
                                      topic = data_session["topic"],
                                      broker = data_session["broker"],
                                      shared_editors = data_session["shared_editors"])
-    session.start_session()
+    session.start()
+    get_workbench().bind("CoLiveSessionEnd", cleanup)
 
 def create_session():
     top = CreateSessionDialog(WORKBENCH)
@@ -62,7 +83,8 @@ def join_session_vanilla(data = None):
                                    topic = data_sess["topic"],
                                    broker = data_sess["broker"])
     
-    session.start_session()
+    session.start()
+    get_workbench().bind("CoLiveSessionEnd", cleanup)
 
 def join_session():
     top = JoinSessionDialog(WORKBENCH)
@@ -75,10 +97,12 @@ def join_session():
     join_session_vanilla(top.data)
 
 def end_session():
-    pass
+    global session
+    session.end()
 
 def leave_session():
-    pass
+    global session
+    session.leave()
 
 def session_status():
     pass
@@ -149,35 +173,35 @@ def get_commands():
                 "enable": lambda: not live_session()
             },
             # For testing only
-            {
-                "command_id": "codelive_host_t",
-                "menu_name": MENU_NAME,
-                "command_label": "Create Test",
-                "handler" : create_session_vanilla,
-                "position_in_group": "end",
-                "image" : None,
-                "tester": lambda: not live_session(),
-                "caption" : "Create Test",
-                "include_in_menu" : True,
-                "include_in_toolbar" : False,
-                "bell_when_denied" : True,
-                "enable": lambda: not live_session()
-            },
-            # For testing only
-            {
-                "command_id": "codelive_join_t",
-                "menu_name": MENU_NAME,
-                "command_label": "Join Test",
-                "handler" : join_session_vanilla,
-                "position_in_group": "end",
-                "image" : None,
-                "tester": lambda: not live_session(),
-                "caption" : "Join Test",
-                "include_in_menu" : True,
-                "include_in_toolbar" : False,
-                "bell_when_denied" : True,
-                "enable": lambda: not live_session()
-            },
+            # {
+            #     "command_id": "codelive_host_t",
+            #     "menu_name": MENU_NAME,
+            #     "command_label": "Create Test",
+            #     "handler" : create_session_vanilla,
+            #     "position_in_group": "end",
+            #     "image" : None,
+            #     "tester": lambda: not live_session(),
+            #     "caption" : "Create Test",
+            #     "include_in_menu" : True,
+            #     "include_in_toolbar" : False,
+            #     "bell_when_denied" : True,
+            #     "enable": lambda: not live_session()
+            # },
+            # # For testing only
+            # {
+            #     "command_id": "codelive_join_t",
+            #     "menu_name": MENU_NAME,
+            #     "command_label": "Join Test",
+            #     "handler" : join_session_vanilla,
+            #     "position_in_group": "end",
+            #     "image" : None,
+            #     "tester": lambda: not live_session(),
+            #     "caption" : "Join Test",
+            #     "include_in_menu" : True,
+            #     "include_in_toolbar" : False,
+            #     "bell_when_denied" : True,
+            #     "enable": lambda: not live_session()
+            # },
         ],
 
         21 : [
@@ -188,12 +212,12 @@ def get_commands():
                 "handler" : end_session,
                 "position_in_group": "end",
                 "image" : None,
-                "tester": live_session,
+                "tester": lambda: live_session() and session.is_host,
                 "caption" : "End current session (for Hosts only)",
                 "include_in_menu" : True,
                 "include_in_toolbar" : False,
                 "bell_when_denied" : True,
-                "enable": live_session
+                "enable": lambda: live_session() and session.is_host
             },
             {
                 "command_id": "codelive_leave",

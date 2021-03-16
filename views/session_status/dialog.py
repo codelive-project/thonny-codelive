@@ -117,15 +117,9 @@ class ActionList(ttk.Frame):
 
     def _leave_callback(self):
         ret = self.session.leave()
-        
-        if ret == 0:
-            self.winfo_parent().destroy()
 
     def _end_callback(self):
         ret = self.session.end()
-        
-        if ret == 0:
-            self.winfo_parent().destroy()
 
 class SessionDialog(tk.Toplevel):
     def __init__(self, parent, session):
@@ -193,8 +187,10 @@ class SessionDialog(tk.Toplevel):
     def add_user(self, user):
         self.user_list.add_user(user)
 
-    def remove_user(self, user):
-        self.user_list.remove_id(user.id)
+    def remove_id(self, rm_id, new_host = None):
+        self.user_list.remove_id(rm_id)
+        if new_host != None:
+            self.update_host(new_host)
 
     def on_closing(self):
         pass
@@ -268,8 +264,10 @@ if __name__ == "__main__":
                 r.update_host(_id)
         
         button_mh = ttk.Button(frame, text = "Make", command = make_host)
+        button_dest = ttk.Button(frame, text = "Destroy", command = lambda: r.destroy())
         text.grid(row = 0, column = 0, padx = (10, 2.5), pady = 10)
-        button_mh.grid(row = 0, column = 1, padx = (2.5, 10), pady = 10)
+        button_mh.grid(row = 0, column = 1, padx = (2.5, 10), pady = (10, 0))
+        button_dest.grid(row = 1, column = 1, padx = (2.5, 10), pady = (0, 10))
         frame.pack()
 
     elif sys.argv[1] == "info":
