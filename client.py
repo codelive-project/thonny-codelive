@@ -263,6 +263,10 @@ class Session:
         }
 
         self.send(msg)
+    
+    def remove_user(self, rm_id, new_host = None):
+        del self._users[rm_id]
+        self.dialog.remove_id(rm_id, new_host)
 
     def request_control(self):
         '''
@@ -280,6 +284,20 @@ class Session:
         self.user_man.request_give(event.user)
         return 0
 
+    def nominate_host(self):
+        '''
+        ***TO BE UPDATED***
+        new host SHOULD be nominated based on how "alive" they are. For now we nominat ethe person with
+        earliest id
+        '''
+        ids = list(self._users.keys())
+        ids.remove(self.user_id)
+        return min(ids) if len(ids) > 0 else None
+
+    def start(self):
+        self._connection.Connect()
+        self.user_man.Connect()
+    
     def leave(self):
         '''
         Attempts to leave the session
@@ -287,7 +305,15 @@ class Session:
         On success, returns 0
         On failure, returns 1
         '''
-        pass
+        try:
+            self.user_man.announce_leave()
+            self.vanilla_end()
+            return 0
+        except Exception as e:
+            if self._debug:
+                print(e)
+            return 1
+
 
     def end(self):
         '''
@@ -298,8 +324,42 @@ class Session:
         '''
         if not self.is_host:
             return 1
+        try:
+            self.user_man.announce_end()
+            self.vanilla_end(end = True)
+            return 0
+        except Exception as e:
+            if self._debug:
+                print(e)
+            return 1
+    
+    def remote_leave(self, json_msg):
+        if "new_host" in json_msg:
+            self.change_host(json_msg["new_host"], True)
+        self.remove_user(json_msg["id"])
+
+    def remote_end(self, json_msg):
+        _id, _ = self.get_driver()
+        if json_msg["id"] != _id:
+            return
+        self.vanilla_end(is_remote = True, end = True)
+
+    def vanilla_end(self, is_remote = False, end = False):
+        '''
+        - announce you are leaving
+        - disconnect from network
+        - unbind callbacks
+        - enable edits
+        - destroy dialog
+        '''
+        self._connection.Disconnect()
+        self.user_man.Disconnect()
         
-        pass
+        self.unbind_all()
+        self.enable_editing()
+
+        self.dialog.destroy()
+        get_workbench().event_generate("CoLiveSessionEnd", remote = is_remote, end = end)
 
     def _enumerate_s_ed(self, shared_editors):
         id_f = {i : editor for (i , editor) in enumerate(shared_editors)}
@@ -515,9 +575,9 @@ class Session:
 
         self.send(instr)
 
-    def change_host(self, user_id = None):
+    def change_host(self, user_id = None, forced = False):
         if user_id == self.user_id:
-            self.be_host()
+            self.be_host(forced)
         elif self.is_host:
             self.be_copilot(user_id)
         elif user_id != None:
@@ -525,9 +585,14 @@ class Session:
         else:
             print("Err: ", user_id, "is not a valid input")
 
-    def be_host(self):
+    def be_host(self, forced = False):
         _id, _ = self.get_driver()
 
+        if forced:
+            tk.messagebox.showinfo(parent = get_workbench(),
+                                   title = "New Driver",
+                                   message = "The host has left the session. You have been selected as the driver.")
+        
         self.enable_editing()
 
         self._users[_id].is_host = False 
@@ -581,6 +646,7 @@ class Session:
 
             widget.set_read_only(False)
             tk.Text.insert(widget, pos, new_text)
+            # widget.mark_set(tk.INSERT, msg["user_pos"])
             widget.see(msg["user_pos"])
             widget.set_read_only(True)
         
@@ -590,12 +656,15 @@ class Session:
                 tk.Text.delete(widget, msg["start"], msg["end"])
             else:
                 tk.Text.delete(widget, msg["start"])
+            # widget.mark_set(tk.INSERT, msg["user_pos"])
+            widget.see(msg["user_pos"])
             widget.set_read_only(True)
         
         elif msg["type"] == "S":
             widget.set_read_only(False)
             tk.Text.delete(widget, "0.0", tk.END)
             tk.Text.insert(widget, "0.0", msg["text"])
+            # widget.mark_set(tk.INSERT, msg["user_pos"])
             widget.see(msg["user_pos"])
             widget.set_read_only(True)
 
@@ -622,12 +691,6 @@ class Session:
                          str(col if is_keypress else col - 1)
             text_widget.tag_add(user_id, real_index)
             text_widget.tag_configure(user_id, background=color)
-
-    def start_session(self):
-        self._connection.Connect()
-        self._connection.loop_start()
-        self.user_man.Connect()
-        self.user_man.loop_start()
 
 if __name__ == "__main__":
 

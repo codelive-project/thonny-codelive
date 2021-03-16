@@ -278,6 +278,14 @@ class MqttConnection(mqtt_client.Client):
 
         if self.session.is_host:
             mqtt_client.Client.subscribe(self, self.topic + "/" + str(self.session.user_id), qos=self.qos)
+        
+        self.loop_start()
+    
+    def Disconnect(self):
+        self.unsubscribe(self.topic)
+        self.unsubscribe(self.topic + "/" + str(self.session.user_id))
+        self.loop_stop()
+        self.disconnect()
     
     def get_sender(self, msg):
         pass
