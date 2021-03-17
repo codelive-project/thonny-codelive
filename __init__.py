@@ -25,6 +25,8 @@ BUG_REPORT_URL = "https://github.com/codelive-project/codelive/issues/new"
 HELP_URL = "https://codelive-project.github.io/"    # Replace with URL for help page
 ABOUT_URL = "https://codelive-project.github.io/"
 
+CODELIVE_PATH = os.path.dirname(__file__)
+
 WORKBENCH = get_workbench()
 MENU_NAME = "CodeLive"
 session = None
@@ -148,7 +150,7 @@ def get_commands():
                 "handler" : toolbar_callback,
                 "position_in_group": "end",
                 "tester": None,
-                "image" : os.path.join(os.path.dirname(__file__), "res/people-yellow-small.png"),
+                "image" : os.path.join(CODELIVE_PATH, "res/people-yellow-small.png"),
                 "caption" : "CodeLive: MQTT based collaboration plugin",
                 "include_in_menu" : False,
                 "include_in_toolbar" : True,
