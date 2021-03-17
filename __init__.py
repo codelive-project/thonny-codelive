@@ -2,6 +2,7 @@
 import os
 import types
 import tkinter as tk
+import webbrowser
 
 from tkinter.messagebox import showinfo
 from tkinter import Message, Button
@@ -19,6 +20,10 @@ from thonny.plugins.codelive.views.toolbar_popup import ToolbarPopup
 
 import thonny.plugins.codelive.patched_callbacks as pc
 import thonny.plugins.codelive.utils as utils
+
+BUG_REPORT_URL = "https://github.com/codelive-project/codelive/issues/new"
+HELP_URL = "https://codelive-project.github.io/"    # Replace with URL for help page
+ABOUT_URL = "https://codelive-project.github.io/"
 
 WORKBENCH = get_workbench()
 MENU_NAME = "CodeLive"
@@ -119,6 +124,15 @@ def toolbar_callback():
                                  WORKBENCH.winfo_pointery())
     finally: 
         menu.grab_release()
+
+def bug_report():
+    webbrowser.open(BUG_REPORT_URL)
+
+def _help():
+    webbrowser.open(HELP_URL)
+
+def about():
+    webbrowser.open(ABOUT_URL)
 
 def get_commands():
     global session
@@ -242,7 +256,7 @@ def get_commands():
                 "handler" : session_status,
                 "position_in_group": "end",
                 "image" : None,
-                "tester": live_session,
+                "tester": lambda: False, # live_session,
                 "caption" : "Show the status of the current session",
                 "include_in_menu" : True,
                 "include_in_toolbar" : False,
@@ -252,14 +266,44 @@ def get_commands():
         ],
         23 : [
             {
-                "command_id": "codelive_help",
+                "command_id": "codelive_issue",
                 "menu_name": MENU_NAME,
-                "command_label": "Help",
-                "handler" : session_status,
+                "command_label": "Report Issue",
+                "handler" : bug_report,
                 "position_in_group": "end",
                 "image" : None,
                 "tester": None,
                 "caption" : "Show Help for How to use Codelive",
+                "include_in_menu" : True,
+                "include_in_toolbar" : False,
+                "bell_when_denied" : True,
+                "enable": lambda: True
+            }
+        ],
+        24 : [
+            {
+                "command_id": "codelive_about",
+                "menu_name": MENU_NAME,
+                "command_label": "About Us",
+                "handler" : about,
+                "position_in_group": "end",
+                "image" : None,
+                "tester": None,
+                "caption" : "Learn more about the project",
+                "include_in_menu" : True,
+                "include_in_toolbar" : False,
+                "bell_when_denied" : True,
+                "enable": lambda: True
+            },
+            {
+                "command_id": "codelive_help",
+                "menu_name": MENU_NAME,
+                "command_label": "Help",
+                "handler" : _help,
+                "position_in_group": "end",
+                "image" : None,
+                "tester": None,
+                "caption" : "Need help using " + MENU_NAME,
                 "include_in_menu" : True,
                 "include_in_toolbar" : False,
                 "bell_when_denied" : True,
