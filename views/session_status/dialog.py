@@ -1,10 +1,15 @@
+import os
 import tkinter as tk
+import webbrowser
+
 from tkinter import messagebox
 from tkinter import ttk
 
 from thonny.plugins.codelive.views.session_status.user_list import UserList, UserListItem
 
 SESSION_DIA_MIN_SIZE = {"width": 378, "height": 400}
+BUG_ICON_PATH = os.path.realpath("res/bug-16.png")
+BUG_REPORT_URL = "https://github.com/codelive-project/codelive/issues/new"
 
 class SessionInfo(ttk.LabelFrame):
     def __init__(self, parent, session):
@@ -59,22 +64,23 @@ class ActionList(ttk.Frame):
 
         self.dia = dia
         self.session = session
-        self.request_control = tk.Button(self, text = "Request Control", foreground = "green", command = self._request_callback)
-        leave = tk.Button(self, text = "Leave Session", foreground = "orange", command = self._leave_callback)
-        self.end = tk.Button(self, text = "End Session", foreground = "red", command = self._end_callback)
+        self.request_control = ttk.Button(self, text = "Request Control", command = self._request_callback)
+        leave = ttk.Button(self, text = "Leave Session", command = self._leave_callback)
+        self.end = ttk.Button(self, text = "End Session", command = self._end_callback)
         
-        self.request_control.grid(row = 0, column = 0, columnspan = 2, pady = (5, 2), padx = 10, sticky = tk.N + tk.E + tk.S + tk.W)
-        leave.grid(row = 1, column = 0, pady = (2, 10), padx = (10, 2), sticky = tk.N + tk.E + tk.S + tk.W)
-        self.end.grid(row = 1, column = 1, pady = (2, 10), padx = (2, 10), sticky = tk.N + tk.E + tk.S + tk.W)
+        self.request_control.pack(side = tk.LEFT, padx = (5, 0)) # grid(row = 0, column = 0, columnspan = 2, pady = (5, 2), padx = 10, sticky = tk.N + tk.E + tk.S + tk.W)
+        self.end.pack(side = tk.RIGHT, padx = (0, 0)) #grid(row = 1, column = 1, pady = (2, 10), padx = (2, 10), sticky = tk.N + tk.E + tk.S + tk.W)
+        leave.pack(side = tk.RIGHT, padx = (0, 5))# .grid(row = 1, column = 0, pady = (2, 10), padx = (10, 2), sticky = tk.N + tk.E + tk.S + tk.W)
+        
 
         self.request_control["state"] = tk.DISABLED if session.is_host else tk.NORMAL
         self.end["state"] = tk.NORMAL if session.is_host else tk.DISABLED
 
         # configure for resize
-        self.columnconfigure(0, weight = 1, minsize = 50)
-        self.columnconfigure(1, weight = 1, minsize = 50)
-        self.rowconfigure(0, weight = 1, minsize = 10)
-        self.rowconfigure(1, weight = 1, minsize = 10)
+        # self.columnconfigure(0, weight = 1, minsize = 50)
+        # self.columnconfigure(1, weight = 1, minsize = 50)
+        # self.rowconfigure(0, weight = 1, minsize = 10)
+        # self.rowconfigure(1, weight = 1, minsize = 10)
 
         self.retry_attempt = 0
     
@@ -137,8 +143,16 @@ class SessionDialog(tk.Toplevel):
         self.session_info.grid(row = 0, column = 0, sticky = tk.N + tk.E + tk.W, padx = 10, pady = 5)
         sep1.grid(row = 1, column = 0, sticky = tk.E + tk.W, padx = 10)
         self.user_list.grid(row = 2, column = 0, sticky = tk.N + tk.E + tk.S + tk.W, padx = 10, pady = (5, 5))
-        sep2.grid(row = 3, column = 0, sticky = tk.E + tk.W, padx = 10)
-        self.buttons.grid(row = 4, column = 0, sticky = tk.S + tk.E + tk.W, padx = 10, pady = (5, 10))
+
+        bug_frame = ttk.Frame(frame)
+        bug_icon = tk.PhotoImage(file = BUG_ICON_PATH)
+        bug = ttk.Button(bug_frame, text= "Report Bug", image = bug_icon, compound = tk.LEFT, command = lambda: webbrowser.open(BUG_REPORT_URL))
+        bug.image = bug_icon
+        bug.pack(side = tk.RIGHT)
+
+        bug_frame.grid(row = 3, column = 0, sticky = tk.E + tk.W, padx = 10, pady = (0, 5))
+        sep2.grid(row = 4, column = 0, sticky = tk.E + tk.W, padx = 10)
+        self.buttons.grid(row = 5, column = 0, sticky = tk.S + tk.E + tk.W, padx = 10, pady = (5, 10))
 
         frame.pack(fill = tk.BOTH, expand = True)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
