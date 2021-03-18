@@ -8,7 +8,7 @@ from tkinter import ttk
 from thonny.plugins.codelive.views.session_status.user_list import UserList, UserListItem
 
 SESSION_DIA_MIN_SIZE = {"width": 378, "height": 400}
-BUG_ICON_PATH = os.path.realpath("res/bug-16.png")
+BUG_ICON_PATH = os.path.join(os.path.dirname(__file__), "res", "bug-16.png")
 BUG_REPORT_URL = "https://github.com/codelive-project/codelive/issues/new"
 
 class SessionInfo(ttk.LabelFrame):

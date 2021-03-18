@@ -16,7 +16,7 @@ from thonny.plugins.codelive.client import Session
 
 from thonny.plugins.codelive.views.create_session import CreateSessionDialog
 from thonny.plugins.codelive.views.join_session import JoinSessionDialog
-from thonny.plugins.codelive.views.toolbar_popup import ToolbarPopup 
+from thonny.plugins.codelive.views.toolbar_popup import ToolbarPopup
 
 import thonny.plugins.codelive.patched_callbacks as pc
 import thonny.plugins.codelive.utils as utils
@@ -150,7 +150,7 @@ def get_commands():
                 "handler" : toolbar_callback,
                 "position_in_group": "end",
                 "tester": None,
-                "image" : os.path.join(CODELIVE_PATH, "res/people-yellow-small.png"),
+                "image" : os.path.join(CODELIVE_PATH, "res", "people-yellow-small.png"),
                 "caption" : "CodeLive: MQTT based collaboration plugin",
                 "include_in_menu" : False,
                 "include_in_toolbar" : True,
