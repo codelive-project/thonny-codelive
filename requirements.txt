@@ -1,0 +1,3 @@
+paho-mqtt>=1.5.1
+thonny>=3.2.7
+sortedcontainers>=2.3.0

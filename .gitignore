@@ -1,2 +1,5 @@
 __pycache__
 my_bs
+build
+dist
+thonny_*
