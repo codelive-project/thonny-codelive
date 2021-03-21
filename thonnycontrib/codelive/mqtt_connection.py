@@ -11,10 +11,10 @@ import paho.mqtt.client as mqtt_client
 import paho.mqtt.publish as mqtt_publish
 import paho.mqtt.subscribe as mqtt_subscribe
 
-import thonny.plugins.codelive.utils as utils
-import thonny.plugins.codelive.client as thonny_client
+import thonnycontrib.codelive.utils as utils
+import thonnycontrib.codelive.client as thonny_client
 
-from thonny.plugins.codelive.user import UserDecoder, UserEncoder
+from thonnycontrib.codelive.user import UserDecoder, UserEncoder
 from thonny import get_workbench
 
 WORKBENCH = get_workbench()

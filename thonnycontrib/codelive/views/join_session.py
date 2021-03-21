@@ -1,11 +1,11 @@
 import tkinter as tk
 from tkinter import ttk
 
-from thonny.plugins.codelive.mqtt_connection import topic_exists
+from thonnycontrib.codelive.mqtt_connection import topic_exists
 
-from thonny.plugins.codelive.views.hinttext import HintText
-from thonny.plugins.codelive.views.textspin import TextSpin
-from thonny.plugins.codelive.mqtt_connection import BROKER_URLS
+from thonnycontrib.codelive.views.hinttext import HintText
+from thonnycontrib.codelive.views.textspin import TextSpin
+from thonnycontrib.codelive.mqtt_connection import BROKER_URLS
 
 BG = "#EEEEE4"
 JOIN_DIA_MIN_SIZE = {

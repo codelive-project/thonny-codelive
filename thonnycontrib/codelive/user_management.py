@@ -7,7 +7,7 @@ import tkinter as tk
 
 from thonny import get_workbench
 
-import thonny.plugins.codelive.mqtt_connection as mqttc
+import thonnycontrib.codelive.mqtt_connection as mqttc
 
 
 def get_sender_id(json_msg):
