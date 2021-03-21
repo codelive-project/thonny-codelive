@@ -13,13 +13,13 @@ import types
 from thonny import get_workbench
 from thonny.tktextext import EnhancedText
 
-import thonny.plugins.codelive.patched_callbacks as pc
-import thonny.plugins.codelive.mqtt_connection as cmqtt
-import thonny.plugins.codelive.utils as utils
-import thonny.plugins.codelive.user_management as userManMqtt
+import thonnycontrib.codelive.patched_callbacks as pc
+import thonnycontrib.codelive.mqtt_connection as cmqtt
+import thonnycontrib.codelive.utils as utils
+import thonnycontrib.codelive.user_management as userManMqtt
 
-from thonny.plugins.codelive.user import User, UserEncoder, UserDecoder
-from thonny.plugins.codelive.views.session_status.dialog import SessionDialog
+from thonnycontrib.codelive.user import User, UserEncoder, UserDecoder
+from thonnycontrib.codelive.views.session_status.dialog import SessionDialog
 from thonny.ui_utils import select_sequence
 
 MSGLEN = 2048

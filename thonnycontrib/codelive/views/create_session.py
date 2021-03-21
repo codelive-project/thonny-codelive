@@ -2,11 +2,11 @@ import tkinter as tk
 from tkinter import ttk
 
 from thonny import get_workbench
-from thonny.plugins.codelive.mqtt_connection import generate_topic, topic_exists
+from thonnycontrib.codelive.mqtt_connection import generate_topic, topic_exists
 
-from thonny.plugins.codelive.views.hinttext import HintText
-from thonny.plugins.codelive.views.textspin import TextSpin
-from thonny.plugins.codelive.mqtt_connection import BROKER_URLS
+from thonnycontrib.codelive.views.hinttext import HintText
+from thonnycontrib.codelive.views.textspin import TextSpin
+from thonnycontrib.codelive.mqtt_connection import BROKER_URLS
 
 # For testing only!!!!!
 if __name__ == "__main__":

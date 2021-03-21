@@ -4,7 +4,7 @@ from threading import Lock
 import json
 import random
 
-from thonny.plugins.codelive.res.default_values import COLORS
+from thonnycontrib.codelive.res.default_values import COLORS
 
 def get_color(used_colors = None):
     if used_colors == None:

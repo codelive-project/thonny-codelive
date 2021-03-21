@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from thonny import get_workbench
-from thonny.plugins.codelive.views.session_status.scrollable_frame import ScrollableFrame
+from thonnycontrib.codelive.views.session_status.scrollable_frame import ScrollableFrame
 
 class UserListItem(tk.Frame):
     def __init__(self, parent, user, is_self, is_host):

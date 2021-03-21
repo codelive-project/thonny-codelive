@@ -12,14 +12,14 @@ from thonny import get_workbench
 from thonny.tktextext import EnhancedText, TweakableText
 from thonny.codeview import SyntaxText
 
-from thonny.plugins.codelive.client import Session
+from thonnycontrib.codelive.client import Session
 
-from thonny.plugins.codelive.views.create_session import CreateSessionDialog
-from thonny.plugins.codelive.views.join_session import JoinSessionDialog
-from thonny.plugins.codelive.views.toolbar_popup import ToolbarPopup
+from thonnycontrib.codelive.views.create_session import CreateSessionDialog
+from thonnycontrib.codelive.views.join_session import JoinSessionDialog
+from thonnycontrib.codelive.views.toolbar_popup import ToolbarPopup
 
-import thonny.plugins.codelive.patched_callbacks as pc
-import thonny.plugins.codelive.utils as utils
+import thonnycontrib.codelive.patched_callbacks as pc
+import thonnycontrib.codelive.utils as utils
 
 BUG_REPORT_URL = "https://github.com/codelive-project/codelive/issues/new"
 HELP_URL = "https://codelive-project.github.io/"    # Replace with URL for help page

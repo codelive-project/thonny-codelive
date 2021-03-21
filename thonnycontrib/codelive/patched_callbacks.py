@@ -3,7 +3,7 @@ import tkinter as tk
 
 from thonny import get_workbench
 from thonny.tktextext import TweakableText
-from thonny.plugins.codelive.utils import publish_delete, publish_insert
+from thonnycontrib.codelive.utils import publish_delete, publish_insert
 
 def patched_insert(text_widget, index, chars, *args):
     wb = get_workbench()
