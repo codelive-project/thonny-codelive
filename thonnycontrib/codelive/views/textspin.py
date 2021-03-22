@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+from thonny.misc_utils import running_on_mac_os
+
 class TextSpin(ttk.Frame):
     def __init__(self, master, spin_options, mode = "text", **kw):
         super().__init__(master=master, **kw)
@@ -17,7 +19,11 @@ class TextSpin(ttk.Frame):
         '''
         tk.Option used because thonny themes hide the option to change the value of the default list
         '''
-        self.option_box = tk.OptionMenu(self.frame, self.option_val, *spin_options)
+        if running_on_mac_os():
+            self.option_box = tk.OptionMenu(self.frame, self.option_val, *spin_options)
+        else:
+            self.option_box = ttk.OptionMenu(self.frame, self.option_val, *spin_options)
+
         self.hint_label = ttk.Label(self, textvariable = self.hint_str)
 
         self.frame.pack(side = tk.TOP, fill = tk.BOTH, expand = True)
