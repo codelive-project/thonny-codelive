@@ -13,11 +13,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/codelive-project/thonny-codelive",
     packages=setuptools.find_namespace_packages(),
-    install_requires=[
-        'paho-mqtt>=1.5.1',
-        'thonny>=3.2.7',
-        'sortedcontainers>=2.3.0'
-    ],
+    install_requires=["paho-mqtt>=1.5.1", "thonny>=3.2.7", "sortedcontainers>=2.3.0"],
     package_data={
         "thonnycontrib.codelive": ["res/*.*", "views/*.*"],
     },
@@ -26,6 +22,6 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.7',
-    license="License :: OSI Approved :: MIT License"
+    python_requires=">=3.7",
+    license="License :: OSI Approved :: MIT License",
 )
