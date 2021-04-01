@@ -98,7 +98,7 @@ class Session:
             self.enable_editing()
         else:
             self.disable_editing()
-            self.enable_cursor_blink()
+            # self.enable_cursor_blink()
 
         self.dialog = SessionDialog(WORKBENCH, self)
 
@@ -631,12 +631,12 @@ class Session:
     def enable_editing(self):
         for text_widget in self._shared_editors["txt_first"]:
             text_widget.set_read_only(False)
-        self._sync_pos()
+        # self._sync_pos()
 
     def disable_editing(self):
         for text_widget in self._shared_editors["txt_first"]:
             text_widget.set_read_only(True)
-        self._stop_sync_pos()
+        # self._stop_sync_pos()
 
     def get_connection_info(self):
         return {
@@ -691,7 +691,7 @@ class Session:
             )
 
         self.enable_editing()
-        self.disable_cursor_blink()
+        # self.disable_cursor_blink()
         self._users[_id].is_host = False
         self.is_host = self._users[self.user_id].is_host = True
 
@@ -699,7 +699,7 @@ class Session:
 
     def be_copilot(self, new_host_id=None):
         self.disable_editing()
-        self.enable_cursor_blink()
+        # self.enable_cursor_blink()
         if new_host_id != None:
             self._users[new_host_id].is_host = True
         self.is_host = self._users[self.user_id].is_host = False

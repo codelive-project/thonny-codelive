@@ -96,7 +96,6 @@ def join_session_vanilla(data=None):
 
     session.start()
     get_workbench().bind("CoLiveSessionEnd", cleanup)
-    pulse_button()
 
 
 def join_session():

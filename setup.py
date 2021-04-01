@@ -12,7 +12,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="thonny-codelive",
-    version="0.0.3",
+    version="0.0.4",
     author="Codelive Project",
     author_email="sgz4@students.calvin.edu",
     description="Thonny plugin for live collaboration using MQTT",
