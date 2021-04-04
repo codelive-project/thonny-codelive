@@ -30,19 +30,19 @@ BROKER_URLS = [
 ]
 
 USER_COLORS = ["blue", "green", "red", "pink", "orange", "black", "white", "purple"]
-SINGLE_PUBLISH_HEADER = b'CODELIVE_MSG:'
+SINGLE_PUBLISH_HEADER = b"CODELIVE_MSG:"
+
 
 def topic_exists(s):
     # TODO: complete
-    '''
+    """
     Alog:
 
     1. Send a message to a possible host
     2. Wait for a reply for 5 secs
         if reply, return True
         else, return False
-    '''
-    
+    """
 
     return False
 
@@ -160,9 +160,11 @@ class MqttConnection(mqtt_client.Client):
             response = cls._handshake_helper(name, topic, broker)
             if response == None:
                 # show message
-                resp = tk.messagebox.askyesno(master=WORKBENCH,
-                                       title = "Join Attempt Failed",
-                                       message = "Failed to connect to session host. Do you want to try again?")
+                resp = tk.messagebox.askyesno(
+                    master=WORKBENCH,
+                    title="Join Attempt Failed",
+                    message="Failed to connect to session host. Do you want to try again?",
+                )
                 if resp == "no":
                     break
             else:
@@ -208,19 +210,22 @@ class MqttConnection(mqtt_client.Client):
             return mqtt_subscribe.simple(topic, hostname=hostname).payload
 
         _lock = threading.Lock()
+
         def is_valid(msg):
             if msg.topic != topic:
                 return False
-            
+
             _msg = msg.payload
 
-            return len(_msg) >= len(SINGLE_PUBLISH_HEADER) and \
-                   _msg[:len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER
+            return (
+                len(_msg) >= len(SINGLE_PUBLISH_HEADER)
+                and _msg[: len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER
+            )
 
         def on_message(client, data, _msg):
             if is_valid(_msg):
                 with _lock:
-                    cls._single_msg = _msg.payload[len(SINGLE_PUBLISH_HEADER):]
+                    cls._single_msg = _msg.payload[len(SINGLE_PUBLISH_HEADER) :]
 
         temp_client = mqtt_client.Client()
         temp_client.on_message = on_message
