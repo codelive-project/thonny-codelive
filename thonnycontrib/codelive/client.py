@@ -115,8 +115,12 @@ class Session:
     @classmethod
     def join_session(cls, name, topic, broker, debug=False):
         current_state = cmqtt.MqttConnection.handshake(name, topic, broker)
-        if debug:
-            print(current_state)
+        if current_state == None:
+            tk.messagebox.showerror(master = WORKBENCH, 
+                                    title = "Unable to Connect",
+                                    message = "You are unable to join a session at this time. Please try again later.")
+            return None
+
         shared_editors = utils.intiialize_documents(current_state["docs"])
         users = {user.id: user for user in current_state["users"]}
 

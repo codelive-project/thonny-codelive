@@ -94,8 +94,9 @@ def join_session_vanilla(data=None):
         name=data_sess["name"], topic=data_sess["topic"], broker=data_sess["broker"]
     )
 
-    session.start()
-    get_workbench().bind("CoLiveSessionEnd", cleanup)
+    if session != None:
+        session.start()
+        get_workbench().bind("CoLiveSessionEnd", cleanup)
 
 
 def join_session():

@@ -6,7 +6,9 @@ import sys
 import time
 import uuid
 import copy
+import threading
 
+import tkinter as tk
 import paho.mqtt.client as mqtt_client
 import paho.mqtt.publish as mqtt_publish
 import paho.mqtt.subscribe as mqtt_subscribe
@@ -28,10 +30,20 @@ BROKER_URLS = [
 ]
 
 USER_COLORS = ["blue", "green", "red", "pink", "orange", "black", "white", "purple"]
-
+SINGLE_PUBLISH_HEADER = b'CODELIVE_MSG:'
 
 def topic_exists(s):
     # TODO: complete
+    '''
+    Alog:
+
+    1. Send a message to a possible host
+    2. Wait for a reply for 5 secs
+        if reply, return True
+        else, return False
+    '''
+    
+
     return False
 
 
@@ -142,6 +154,25 @@ class MqttConnection(mqtt_client.Client):
 
     @classmethod
     def handshake(cls, name, topic, broker):
+        retries = 0
+
+        while retries < 5:
+            response = cls._handshake_helper(name, topic, broker)
+            if response == None:
+                # show message
+                resp = tk.messagebox.askyesno(master=WORKBENCH,
+                                       title = "Join Attempt Failed",
+                                       message = "Failed to connect to session host. Do you want to try again?")
+                if resp == "no":
+                    break
+            else:
+                return response
+            retries += 1
+
+        return None
+
+    @classmethod
+    def _handshake_helper(cls, name, topic, broker):
 
         my_id = random.randint(-1000, -1)
         reply_url = str(uuid.uuid4())
@@ -163,7 +194,8 @@ class MqttConnection(mqtt_client.Client):
 
     @classmethod
     def single_publish(cls, topic, payload, hostname):
-        mqtt_publish.single(topic, payload=payload, hostname=hostname)
+        msg = SINGLE_PUBLISH_HEADER + bytes(payload, "utf-8")
+        mqtt_publish.single(topic, payload=msg, hostname=hostname)
 
     @classmethod
     def single_subscribe(cls, topic, hostname, timeout=None):
@@ -175,9 +207,20 @@ class MqttConnection(mqtt_client.Client):
         if timeout == None:
             return mqtt_subscribe.simple(topic, hostname=hostname).payload
 
+        _lock = threading.Lock()
+        def is_valid(msg):
+            if msg.topic != topic:
+                return False
+            
+            _msg = msg.payload
+
+            return len(_msg) >= len(SINGLE_PUBLISH_HEADER) and \
+                   _msg[:len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER
+
         def on_message(client, data, _msg):
-            if _msg.topic == topic:
-                MqttConnection._single_msg = _msg.payload
+            if is_valid(_msg):
+                with _lock:
+                    cls._single_msg = _msg.payload[len(SINGLE_PUBLISH_HEADER):]
 
         temp_client = mqtt_client.Client()
         temp_client.on_message = on_message
@@ -188,18 +231,18 @@ class MqttConnection(mqtt_client.Client):
 
         # block as long as the message is None and time hasn't run out
         start_time = time.perf_counter()
-        while (
-            MqttConnection._single_msg == None
-            and time.perf_counter() - start_time < timeout
-        ):
-            pass
+        wait = True
+        while wait:
+            with _lock:
+                wait = cls._single_msg == None
+            wait = wait and time.perf_counter() - start_time < timeout
 
         # clean up
         temp_client.loop_stop()
         temp_client.disconnect()
 
-        copy_msg = copy.deepcopy(MqttConnection._single_msg)
-        MqttConnection._single_msg = None
+        copy_msg = copy.deepcopy(cls._single_msg)
+        cls._single_msg = None
 
         return copy_msg
 
