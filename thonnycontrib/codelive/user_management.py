@@ -37,6 +37,7 @@ class MqttUserManagement(mqtt_client.Client):
         self.port = port
         self.qos = qos
         self.delay = delay
+        self.main_topic = topic
         self.users_topic = topic + "/" + "UserManagement"
         self.reply_topic = None
         self.my_id_topic = self.users_topic + "/" + str(self.session.user_id)
@@ -197,3 +198,18 @@ class MqttUserManagement(mqtt_client.Client):
         mqttc.MqttConnection.single_publish(
             self.users_topic, json.dumps(instr), self.broker
         )
+
+    def announce_active(self):
+        instr = dict()
+
+        instr["type"] = "A"
+        instr["id"] = self.session.user_id
+        instr["is_host"] = self.session.is_host
+
+        mqttc.MqttConnection.single_publish(self.users_topic, instr, self.broker)
+        if self.session.is_host:
+            self.announce_host()
+
+    def announce_host(self):
+        instr = "codelive-active"  # replace with a unique hash
+        mqttc.MqttConnection.single_publish(self.users_topic, instr, self.broker)
