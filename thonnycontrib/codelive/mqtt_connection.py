@@ -33,25 +33,29 @@ USER_COLORS = ["blue", "green", "red", "pink", "orange", "black", "white", "purp
 SINGLE_PUBLISH_HEADER = b"CODELIVE_MSG:"
 
 
-def topic_exists(s):
-    # TODO: complete
-    """
-    Alog:
+def topic_exists(topic, broker = "test.mosquitto.org", timeout = 4):
+    my_id = -1
+    reply_url = str(uuid.uuid4())
 
-    1. Send a message to a possible host
-    2. Wait for a reply for 5 secs
-        if reply, return True
-        else, return False
-    """
+    greeting = {
+        "id": my_id,
+        "instr": {"type": "exist", "name": "Ablf3brhwb", "reply": reply_url},
+    }
+    MqttConnection.single_publish(
+        topic, payload=json.dumps(greeting), hostname=broker
+    )
 
-    return False
+    payload = MqttConnection.single_subscribe(
+        topic + "/" + reply_url, hostname=broker, timeout= timeout
+    )
+    print("Response: ", payload, "end")
+    return payload.decode("utf-8")
 
 
-def generate_topic():
-    # TODO: complete
+def generate_topic(broker = None, num_trials = 4):
     existing_names = set()
 
-    while True:
+    for i in range(num_trials):
         name = "_".join(
             [USER_COLORS[random.randint(0, len(USER_COLORS) - 1)] for _ in range(4)]
         )
@@ -60,12 +64,13 @@ def generate_topic():
         if name in existing_names:
             continue
 
-        if topic_exists(name):
+        if topic_exists(name, broker):
             print("Topic %s is taken. Trying another random name..." % repr(name))
             existing_names.add(name)
         else:
             return name
 
+    raise TimeoutError("Timeout: Unable to generate a free topic in the specified number of trials.")
 
 def get_sender_id(json_msg):
     return json_msg["id"]
@@ -144,8 +149,9 @@ class MqttConnection(mqtt_client.Client):
         self.topic = topic
         self.assigned_ids = dict()  # for handshake
 
+        print(topic_exists(self.topic, self.broker))
         if topic == None:
-            self.topic = generate_topic()
+            self.topic = generate_topic(self.broker)
             if self.session._debug:
                 print("New Topic: %s" % self.topic)
         else:
@@ -191,7 +197,7 @@ class MqttConnection(mqtt_client.Client):
             topic + "/" + reply_url, hostname=broker, timeout=4
         )
         response = json.loads(payload, cls=UserDecoder)
-
+        print("Response: ", response, "end")
         return response
 
     @classmethod
@@ -280,6 +286,10 @@ class MqttConnection(mqtt_client.Client):
         if instr["type"] == "join" and self.session.is_host:
             self.respond_to_handshake(sender_id, instr["reply"], instr["name"])
 
+        elif instr["type"] == "exist" and self.session.is_host:
+            print("here")
+            self.respond_to_exist(instr["reply"])
+
         # on edit
         elif instr["type"] in ("I", "D", "S", "M"):
             WORKBENCH.event_generate("RemoteChange", change=instr)
@@ -298,6 +308,13 @@ class MqttConnection(mqtt_client.Client):
         }
         mqtt_client.Client.publish(
             self, self.topic, payload=json.dumps(send_msg, cls=UserEncoder)
+        )
+
+    def respond_to_exist(self,reply_url):
+        MqttConnection.single_publish(
+            self.topic + "/" + reply_url,
+            payload=True,
+            hostname=self.broker,
         )
 
     def respond_to_handshake(self, sender_id, reply_url, name):
