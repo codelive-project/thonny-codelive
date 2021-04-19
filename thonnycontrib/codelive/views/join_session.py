@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from thonnycontrib.codelive.mqtt_connection import topic_exists
+from thonnycontrib.codelive.mqtt_connection import topic_exists, broker_exists
 
 from thonnycontrib.codelive.views.hinttext import HintText
 from thonnycontrib.codelive.views.textspin import TextSpin
@@ -164,14 +164,13 @@ class JoinSessionDialog(tk.Toplevel):
             )
             return False
 
-        if len(broker) < 12:
+        if len(broker) < 12 or not broker_exists(broker):
             tk.messagebox.showerror(
-                parent=self, title="Error", message="Please provide a valid broker."
+                parent=self, title="Error", message="The broker you provided was invalid."
             )
             return False
 
-        # TODO: replace with topic_exists(s) when topic_exists's logic is complete
-        if False:  # topic_exists(topic, broker):
+        if not topic_exists(topic, broker):
             tk.messagebox.showerror(
                 parent=self,
                 title="Error",

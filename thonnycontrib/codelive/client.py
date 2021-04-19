@@ -63,7 +63,7 @@ class Session:
         )
 
         # Network handles
-        self._connection = cmqtt.MqttConnection(self, broker_url=broker, topic=topic)
+        self._connection = cmqtt.MqttConnection(self, topic=topic, broker_url=broker)
         self._network_lock = threading.Lock()
 
         # client privilage flags

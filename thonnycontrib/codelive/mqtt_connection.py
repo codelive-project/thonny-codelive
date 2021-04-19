@@ -32,8 +32,19 @@ BROKER_URLS = [
 USER_COLORS = ["blue", "green", "red", "pink", "orange", "black", "white", "purple"]
 SINGLE_PUBLISH_HEADER = b"CODELIVE_MSG:"
 
+def broker_exists(broker):
+    try:
+        temp_client = mqtt_client.Client()
+        temp_client.connect(host=broker)
+        temp_client.disconnect()
+        return True
+    except Exception as e:
+        return False
 
-def topic_exists(topic, broker = "test.mosquitto.org", timeout = 4):
+def topic_exists(topic, broker = "test.mosquitto.org", timeout = 4, broker_check = True):
+    if broker_check and not broker_exists(broker):
+        raise ValueError("Error: Unable to connect to broker.")
+
     my_id = -1
     reply_url = str(uuid.uuid4())
 
@@ -48,8 +59,8 @@ def topic_exists(topic, broker = "test.mosquitto.org", timeout = 4):
     payload = MqttConnection.single_subscribe(
         topic + "/" + reply_url, hostname=broker, timeout= timeout
     )
-    print("Response: ", payload, "end")
-    return payload.decode("utf-8")
+
+    return payload != None
 
 
 def generate_topic(broker = None, num_trials = 4):
@@ -64,7 +75,7 @@ def generate_topic(broker = None, num_trials = 4):
         if name in existing_names:
             continue
 
-        if topic_exists(name, broker):
+        if topic_exists(name, broker, 1):
             print("Topic %s is taken. Trying another random name..." % repr(name))
             existing_names.add(name)
         else:
@@ -128,11 +139,11 @@ class MqttConnection(mqtt_client.Client):
     def __init__(
         self,
         session,
+        topic,
         broker_url,
         port=None,
         qos=0,
         delay=1.0,
-        topic=None,
         on_message=None,
         on_publish=None,
         on_connect=None,
@@ -148,15 +159,6 @@ class MqttConnection(mqtt_client.Client):
         self.delay = delay
         self.topic = topic
         self.assigned_ids = dict()  # for handshake
-
-        print(topic_exists(self.topic, self.broker))
-        if topic == None:
-            self.topic = generate_topic(self.broker)
-            if self.session._debug:
-                print("New Topic: %s" % self.topic)
-        else:
-            if self.session._debug:
-                print("Existing topic: %s" % self.topic)
 
     @classmethod
     def handshake(cls, name, topic, broker):
@@ -400,7 +402,7 @@ if __name__ == "__main__":
 
         x = Session_temp()
 
-        myConnection = MqttConnection(x, temp_broker, topic=temp_topic)
+        myConnection = MqttConnection(x, topic=temp_topic, broker_url = temp_broker)
         myConnection.Connect()
         myConnection.loop_start()
 
