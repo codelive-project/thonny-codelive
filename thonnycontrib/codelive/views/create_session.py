@@ -237,7 +237,7 @@ class CreateSessionDialog(tk.Toplevel):
 
         return editors
 
-    def broker_changed(self):
+    def broker_changed(self, event = None):
         self.topic_input.state(tk.NORMAL)
         self.auto_gen_topic_state.set(0)
 
