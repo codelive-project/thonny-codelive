@@ -161,48 +161,6 @@ class MqttConnection(mqtt_client.Client):
         self.assigned_ids = dict()  # for handshake
 
     @classmethod
-    def handshake(cls, name, topic, broker):
-        retries = 0
-
-        while retries < 5:
-            response = cls._handshake_helper(name, topic, broker)
-            if response == None:
-                # show message
-                resp = tk.messagebox.askyesno(
-                    master=WORKBENCH,
-                    title="Join Attempt Failed",
-                    message="Failed to connect to session host. Do you want to try again?",
-                )
-                if resp == "no":
-                    break
-            else:
-                return response
-            retries += 1
-
-        return None
-
-    @classmethod
-    def _handshake_helper(cls, name, topic, broker):
-
-        my_id = random.randint(-1000, -1)
-        reply_url = str(uuid.uuid4())
-
-        greeting = {
-            "id": my_id,
-            "instr": {"type": "join", "name": name, "reply": reply_url},
-        }
-
-        MqttConnection.single_publish(
-            topic, payload=json.dumps(greeting), hostname=broker
-        )
-        payload = MqttConnection.single_subscribe(
-            topic + "/" + reply_url, hostname=broker, timeout=4
-        )
-        response = json.loads(payload, cls=UserDecoder)
-        print("Response: ", response, "end")
-        return response
-
-    @classmethod
     def single_publish(cls, topic, payload, hostname):
         msg = SINGLE_PUBLISH_HEADER + bytes(payload, "utf-8")
         mqtt_publish.single(topic, payload=msg, hostname=hostname)
@@ -268,9 +226,12 @@ class MqttConnection(mqtt_client.Client):
 
         if msg.topic != self.topic:
             return
-
+        
+        json_msg = ""
+        if len(msg.payload) >= len(SINGLE_PUBLISH_HEADER) and msg.payload[: len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER:
+            msg.payload = msg.payload[len(SINGLE_PUBLISH_HEADER):]
+            
         json_msg = json.loads(msg.payload, cls=UserDecoder)
-
         if self.session._debug:
             print(json_msg)
         try:
@@ -284,12 +245,7 @@ class MqttConnection(mqtt_client.Client):
                 print("instr ignored")
             return
 
-        # on join request
-        if instr["type"] == "join" and self.session.is_host:
-            self.respond_to_handshake(sender_id, instr["reply"], instr["name"])
-
         elif instr["type"] == "exist" and self.session.is_host:
-            print("here")
             self.respond_to_exist(instr["reply"])
 
         # on edit
@@ -315,33 +271,7 @@ class MqttConnection(mqtt_client.Client):
     def respond_to_exist(self,reply_url):
         MqttConnection.single_publish(
             self.topic + "/" + reply_url,
-            payload=True,
-            hostname=self.broker,
-        )
-
-    def respond_to_handshake(self, sender_id, reply_url, name):
-
-        assigned_id = self.session.get_new_user_id()
-
-        def get_unique_name(_name):
-            name_list = [user.name for user in self.session.get_active_users(False)]
-            if _name not in name_list:
-                return _name
-
-            else:
-                return "%s (%d)" % (_name, assigned_id)
-
-        message = {
-            "id": self.session.user_id,
-            "name": get_unique_name(name),
-            "id_assigned": assigned_id,
-            "docs": self.session.get_docs(),
-            "users": self.session.get_active_users(False),
-        }
-
-        MqttConnection.single_publish(
-            self.topic + "/" + reply_url,
-            payload=json.dumps(message, cls=UserEncoder),
+            payload="True",
             hostname=self.broker,
         )
 
