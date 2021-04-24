@@ -3,3 +3,5 @@ my_bs
 build
 dist
 thonny_*
+_test.py
+.vscode
