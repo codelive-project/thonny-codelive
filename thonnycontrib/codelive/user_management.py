@@ -253,7 +253,7 @@ class MqttUserManagement(mqtt_client.Client):
             "instr": {"type": "request_control", "approved": approved}
         }
         instr = get_instr(json_msg)
-        mqtt_publish.single(
+        mqttc.MqttConnection.single_publish(
             instr["reply"], payload=json.dumps(response), hostname=self.broker
         )
 
