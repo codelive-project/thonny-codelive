@@ -45,11 +45,19 @@ class MqttUserManagement(mqtt_client.Client):
         self.users_topic = topic + "/" + "UserManagement"
         self.reply_topic = None
         self.my_id_topic = self.users_topic + "/" + str(self.session.user_id)
+        self.exit_topic = self.users_topic + "/" + "UserExitHandling"
+
 
     def Connect(self):
+        last_will_msg = {
+            "id": self.session.user_id,
+            "instr": {"type": "lastWillExit", "new_host": None},
+        }
+        mqtt_client.Client.will_set(self, self.users_topic, json.dumps(last_will_msg), 1, True)
         mqtt_client.Client.connect(self, self.broker, self.port, 60)
         mqtt_client.Client.subscribe(self, self.users_topic, qos=self.qos)
         mqtt_client.Client.subscribe(self, self.my_id_topic, qos=self.qos)
+
         self.loop_start()
 
     def Disconnect(self):
@@ -203,6 +211,17 @@ class MqttUserManagement(mqtt_client.Client):
             self.session.remote_leave(json_msg)
         elif instr["type"] == "end":
             self.session.remote_end(json_msg)
+        elif instr['type'] == "lastWillExit":
+            self.last_will_exit(json_msg)
+
+    def last_will_exit(self, json_msg):
+        print(json_msg["id"], self.session.get_driver()[0])
+        if json_msg["id"] == self.session.get_driver()[0]:
+            new_host = self.session.nominate_host()
+            json_msg['instr']['new_host'] = new_host
+            print(json_msg)
+        self.session.remote_leave(json_msg)
+
 
     def request_give(self, targetID):
         if targetID not in self.session._users or targetID == self.session.user_id:
@@ -253,7 +272,7 @@ class MqttUserManagement(mqtt_client.Client):
             "instr": {"type": "request_control", "approved": approved}
         }
         instr = get_instr(json_msg)
-        mqtt_publish.single(
+        mqttc.MqttConnection.single_publish(
             instr["reply"], payload=json.dumps(response), hostname=self.broker
         )
 

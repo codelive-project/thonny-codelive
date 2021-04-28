@@ -311,11 +311,11 @@ class Session:
     def nominate_host(self):
         """
         ***TO BE UPDATED***
-        new host SHOULD be nominated based on how "alive" they are. For now we nominat ethe person with
+        new host SHOULD be nominated based on how "alive" they are. For now we nominate the person with
         earliest id
         """
         ids = list(self._users.keys())
-        ids.remove(self.user_id)
+        ids.remove(self.get_driver()[0])
         return min(ids) if len(ids) > 0 else None
 
     def start(self):
