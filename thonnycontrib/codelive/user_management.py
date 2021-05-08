@@ -4,6 +4,7 @@ import random
 import paho.mqtt.client as mqtt_client
 import paho.mqtt.publish as mqtt_publish
 import paho.mqtt.subscribe as mqtt_subscribe
+import time
 import tkinter as tk
 
 from thonny import get_workbench
@@ -20,7 +21,8 @@ def get_instr(json_msg):
     return json_msg["instr"]
 
 SINGLE_PUBLISH_HEADER = b"CODELIVE_MSG:"
-
+HANDSHAKE_TIMEOUT_SEC = 4
+HANDOFF_TIMEOUT_SEC = 10
 
 class MqttUserManagement(mqtt_client.Client):
     def __init__(
@@ -88,7 +90,7 @@ class MqttUserManagement(mqtt_client.Client):
             if response == None:
                 # show message
                 resp = tk.messagebox.askyesno(
-                    master=WORKBENCH,
+                    master=get_workbench(),
                     title="Join Attempt Failed",
                     message="Failed to connect to session host. Do you want to try again?",
                 )
@@ -108,14 +110,17 @@ class MqttUserManagement(mqtt_client.Client):
 
         greeting = {
             "id": my_id,
-            "instr": {"type": "join", "name": name, "reply": reply_url},
+            "instr": {"type": "join",
+                      "name": name,
+                      "reply": reply_url,
+                      "time": time.time()},
         }
 
         mqttc.MqttConnection.single_publish(
             topic, payload=json.dumps(greeting), hostname=broker
         )
         payload = mqttc.MqttConnection.single_subscribe(
-            topic + "/" + reply_url, hostname=broker, timeout=4
+            topic + "/" + reply_url, hostname=broker, timeout=HANDSHAKE_TIMEOUT_SEC
         )
         response = json.loads(payload, cls=UserDecoder)
         return response
@@ -212,7 +217,11 @@ class MqttUserManagement(mqtt_client.Client):
         self.reply_topic = self.users_topic + "/" + str(uuid.uuid4())
         request = {
             "id": self.session.user_id,
-            "instr": {"type": "request_give", "name": self.session.username, "reply": self.reply_topic}
+            "instr": {"type": "request_give",
+                      "name": self.session.username,
+                      "reply": self.reply_topic,
+                      "time": time.time()
+                    }
         }
         mqtt_client.Client.subscribe(self, self.reply_topic, qos=self.qos)
         mqttc.MqttConnection.single_publish(
@@ -239,7 +248,11 @@ class MqttUserManagement(mqtt_client.Client):
 
         request = {
             "id": self.session.user_id,
-            "instr": {"name": self.session.username, "type": "request_control", "reply": self.reply_topic}
+            "instr": {"name": self.session.username, 
+                      "type": "request_control",
+                      "reply": self.reply_topic,
+                      "time": time.time()
+                    }
         }
 
         mqtt_client.Client.subscribe(self, self.reply_topic, qos=self.qos)
