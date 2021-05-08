@@ -6,7 +6,9 @@ import sys
 import time
 import uuid
 import copy
+import threading
 
+import tkinter as tk
 import paho.mqtt.client as mqtt_client
 import paho.mqtt.publish as mqtt_publish
 import paho.mqtt.subscribe as mqtt_subscribe
@@ -28,18 +30,43 @@ BROKER_URLS = [
 ]
 
 USER_COLORS = ["blue", "green", "red", "pink", "orange", "black", "white", "purple"]
+SINGLE_PUBLISH_HEADER = b"CODELIVE_MSG:"
+
+def broker_exists(broker):
+    try:
+        temp_client = mqtt_client.Client()
+        temp_client.connect(host=broker)
+        temp_client.disconnect()
+        return True
+    except Exception as e:
+        return False
+
+def topic_exists(topic, broker = "test.mosquitto.org", timeout = 4, broker_check = True):
+    if broker_check and not broker_exists(broker):
+        raise ValueError("Error: Unable to connect to broker.")
+
+    my_id = -1
+    reply_url = str(uuid.uuid4())
+
+    greeting = {
+        "id": my_id,
+        "instr": {"type": "exist", "name": "Ablf3brhwb", "reply": reply_url},
+    }
+    MqttConnection.single_publish(
+        topic, payload=json.dumps(greeting), hostname=broker
+    )
+
+    payload = MqttConnection.single_subscribe(
+        topic + "/" + reply_url, hostname=broker, timeout= timeout
+    )
+
+    return payload != None
 
 
-def topic_exists(s):
-    # TODO: complete
-    return False
-
-
-def generate_topic():
-    # TODO: complete
+def generate_topic(broker = None, num_trials = 4):
     existing_names = set()
 
-    while True:
+    for i in range(num_trials):
         name = "_".join(
             [USER_COLORS[random.randint(0, len(USER_COLORS) - 1)] for _ in range(4)]
         )
@@ -48,12 +75,13 @@ def generate_topic():
         if name in existing_names:
             continue
 
-        if topic_exists(name):
+        if topic_exists(name, broker, 1):
             print("Topic %s is taken. Trying another random name..." % repr(name))
             existing_names.add(name)
         else:
             return name
 
+    raise TimeoutError("Timeout: Unable to generate a free topic in the specified number of trials.")
 
 def get_sender_id(json_msg):
     return json_msg["id"]
@@ -111,11 +139,11 @@ class MqttConnection(mqtt_client.Client):
     def __init__(
         self,
         session,
+        topic,
         broker_url,
         port=None,
         qos=0,
         delay=1.0,
-        topic=None,
         on_message=None,
         on_publish=None,
         on_connect=None,
@@ -132,38 +160,10 @@ class MqttConnection(mqtt_client.Client):
         self.topic = topic
         self.assigned_ids = dict()  # for handshake
 
-        if topic == None:
-            self.topic = generate_topic()
-            if self.session._debug:
-                print("New Topic: %s" % self.topic)
-        else:
-            if self.session._debug:
-                print("Existing topic: %s" % self.topic)
-
-    @classmethod
-    def handshake(cls, name, topic, broker):
-
-        my_id = random.randint(-1000, -1)
-        reply_url = str(uuid.uuid4())
-
-        greeting = {
-            "id": my_id,
-            "instr": {"type": "join", "name": name, "reply": reply_url},
-        }
-
-        MqttConnection.single_publish(
-            topic, payload=json.dumps(greeting), hostname=broker
-        )
-        payload = MqttConnection.single_subscribe(
-            topic + "/" + reply_url, hostname=broker, timeout=4
-        )
-        response = json.loads(payload, cls=UserDecoder)
-
-        return response
-
     @classmethod
     def single_publish(cls, topic, payload, hostname):
-        mqtt_publish.single(topic, payload=payload, hostname=hostname)
+        msg = SINGLE_PUBLISH_HEADER + bytes(payload, "utf-8")
+        mqtt_publish.single(topic, payload=msg, hostname=hostname)
 
     @classmethod
     def single_subscribe(cls, topic, hostname, timeout=None):
@@ -175,9 +175,23 @@ class MqttConnection(mqtt_client.Client):
         if timeout == None:
             return mqtt_subscribe.simple(topic, hostname=hostname).payload
 
+        _lock = threading.Lock()
+
+        def is_valid(msg):
+            if msg.topic != topic:
+                return False
+
+            _msg = msg.payload
+
+            return (
+                len(_msg) >= len(SINGLE_PUBLISH_HEADER)
+                and _msg[: len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER
+            )
+
         def on_message(client, data, _msg):
-            if _msg.topic == topic:
-                MqttConnection._single_msg = _msg.payload
+            if is_valid(_msg):
+                with _lock:
+                    cls._single_msg = _msg.payload[len(SINGLE_PUBLISH_HEADER) :]
 
         temp_client = mqtt_client.Client()
         temp_client.on_message = on_message
@@ -188,18 +202,18 @@ class MqttConnection(mqtt_client.Client):
 
         # block as long as the message is None and time hasn't run out
         start_time = time.perf_counter()
-        while (
-            MqttConnection._single_msg == None
-            and time.perf_counter() - start_time < timeout
-        ):
-            pass
+        wait = True
+        while wait:
+            with _lock:
+                wait = cls._single_msg == None
+            wait = wait and time.perf_counter() - start_time < timeout
 
         # clean up
         temp_client.loop_stop()
         temp_client.disconnect()
 
-        copy_msg = copy.deepcopy(MqttConnection._single_msg)
-        MqttConnection._single_msg = None
+        copy_msg = copy.deepcopy(cls._single_msg)
+        cls._single_msg = None
 
         return copy_msg
 
@@ -212,9 +226,12 @@ class MqttConnection(mqtt_client.Client):
 
         if msg.topic != self.topic:
             return
-
+        
+        json_msg = ""
+        if len(msg.payload) >= len(SINGLE_PUBLISH_HEADER) and msg.payload[: len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER:
+            msg.payload = msg.payload[len(SINGLE_PUBLISH_HEADER):]
+            
         json_msg = json.loads(msg.payload, cls=UserDecoder)
-
         if self.session._debug:
             print(json_msg)
         try:
@@ -228,9 +245,8 @@ class MqttConnection(mqtt_client.Client):
                 print("instr ignored")
             return
 
-        # on join request
-        if instr["type"] == "join" and self.session.is_host:
-            self.respond_to_handshake(sender_id, instr["reply"], instr["name"])
+        elif instr["type"] == "exist" and self.session.is_host:
+            self.respond_to_exist(instr["reply"])
 
         # on edit
         elif instr["type"] in ("I", "D", "S", "M"):
@@ -252,29 +268,10 @@ class MqttConnection(mqtt_client.Client):
             self, self.topic, payload=json.dumps(send_msg, cls=UserEncoder)
         )
 
-    def respond_to_handshake(self, sender_id, reply_url, name):
-
-        assigned_id = self.session.get_new_user_id()
-
-        def get_unique_name(_name):
-            name_list = [user.name for user in self.session.get_active_users(False)]
-            if _name not in name_list:
-                return _name
-
-            else:
-                return "%s (%d)" % (_name, assigned_id)
-
-        message = {
-            "id": self.session.user_id,
-            "name": get_unique_name(name),
-            "id_assigned": assigned_id,
-            "docs": self.session.get_docs(),
-            "users": self.session.get_active_users(False),
-        }
-
+    def respond_to_exist(self,reply_url):
         MqttConnection.single_publish(
             self.topic + "/" + reply_url,
-            payload=json.dumps(message, cls=UserEncoder),
+            payload="True",
             hostname=self.broker,
         )
 
@@ -335,7 +332,7 @@ if __name__ == "__main__":
 
         x = Session_temp()
 
-        myConnection = MqttConnection(x, temp_broker, topic=temp_topic)
+        myConnection = MqttConnection(x, topic=temp_topic, broker_url = temp_broker)
         myConnection.Connect()
         myConnection.loop_start()
 

@@ -124,6 +124,7 @@ class CreateSessionDialog(tk.Toplevel):
 
         broker_label = ttk.Label(form_frame, text="MQTT Broker")
         self.broker_input = TextSpin(form_frame, BROKER_URLS, mode="option")
+        self.broker_input.bind("<<ValueChanged>>", self.broker_changed)
 
         self.auto_gen_topic_state = tk.IntVar()
         self.auto_generate_check = ttk.Checkbutton(
@@ -236,6 +237,10 @@ class CreateSessionDialog(tk.Toplevel):
 
         return editors
 
+    def broker_changed(self, event = None):
+        self.topic_input.state(tk.NORMAL)
+        self.auto_gen_topic_state.set(0)
+
     def start_callback(self):
         name = self.name_input.val()
         topic = self.topic_input.val()
@@ -265,6 +270,7 @@ class CreateSessionDialog(tk.Toplevel):
     def default_broker_callback(self):
         is_text = self.default_broker_val.get() == 0
         self.broker_input.mode("text" if is_text else "option")
+        self.broker_changed()
 
     def auto_gen_callback(self):
         # on uncheck
@@ -272,8 +278,16 @@ class CreateSessionDialog(tk.Toplevel):
             self.topic_input.state(tk.NORMAL)
         # on check
         else:
-            self.topic_input.val(generate_topic())
-            self.topic_input.state(tk.DISABLED)
+            try:
+                new_topic = generate_topic(self.broker_input.val())
+                self.topic_input.val(new_topic)
+                self.topic_input.state(tk.DISABLED)
+            except TimeoutError as e:
+                tk.messagebox.showerror(
+                    master=get_workbench(),
+                    title="Timeout error",
+                    message="Rerquest timed out. Please try again."
+                )
 
     def valid_name(self, s):
         if len(s) < 8:
@@ -301,7 +315,7 @@ class CreateSessionDialog(tk.Toplevel):
             return False
 
         # TODO: replace with topic_exists(s) when topic_exists's logic is complete
-        if False:  # topic_exists(topic, broker):
+        if topic_exists(topic, broker):
             tk.messagebox.showerror(
                 parent=self,
                 title="Error",

@@ -63,7 +63,7 @@ class Session:
         )
 
         # Network handles
-        self._connection = cmqtt.MqttConnection(self, broker_url=broker, topic=topic)
+        self._connection = cmqtt.MqttConnection(self, topic=topic, broker_url=broker)
         self._network_lock = threading.Lock()
 
         # client privilage flags
@@ -114,9 +114,15 @@ class Session:
 
     @classmethod
     def join_session(cls, name, topic, broker, debug=False):
-        current_state = cmqtt.MqttConnection.handshake(name, topic, broker)
-        if debug:
-            print(current_state)
+        current_state = userManMqtt.MqttUserManagement.handshake(name, topic, broker)
+        if current_state == None:
+            tk.messagebox.showerror(
+                master=WORKBENCH,
+                title="Unable to Connect",
+                message="You are unable to join a session at this time. Please try again later.",
+            )
+            return None
+
         shared_editors = utils.intiialize_documents(current_state["docs"])
         users = {user.id: user for user in current_state["users"]}
 
@@ -267,7 +273,7 @@ class Session:
                 "instr": {"type": "success", "user": me},
             }
             cmqtt.MqttConnection.single_publish(
-                self._connection.topic + "/" + str(self.get_driver()[0]),
+                self._connection.topic + "/" + "UserManagement"+ "/" + str(self.get_driver()[0]),
                 json.dumps(success_message, cls=UserEncoder),
                 hostname=self._connection.broker,
             )
@@ -351,8 +357,9 @@ class Session:
             return 1
 
     def remote_leave(self, json_msg):
-        if "new_host" in json_msg:
-            self.change_host(json_msg["new_host"], True)
+        instr = json_msg['instr']
+        if instr["new_host"] != None:
+            self.change_host(instr["new_host"], True)
         self.remove_user(json_msg["id"])
 
     def remote_end(self, json_msg):

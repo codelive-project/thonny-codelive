@@ -1,12 +1,15 @@
 import json
 import uuid
+import random
 import paho.mqtt.client as mqtt_client
 import paho.mqtt.publish as mqtt_publish
 import paho.mqtt.subscribe as mqtt_subscribe
+import time
 import tkinter as tk
 
 from thonny import get_workbench
 
+from thonnycontrib.codelive.user import UserDecoder, UserEncoder
 import thonnycontrib.codelive.mqtt_connection as mqttc
 
 
@@ -17,6 +20,9 @@ def get_sender_id(json_msg):
 def get_instr(json_msg):
     return json_msg["instr"]
 
+SINGLE_PUBLISH_HEADER = b"CODELIVE_MSG:"
+HANDSHAKE_TIMEOUT_SEC = 4
+HANDOFF_TIMEOUT_SEC = 10
 
 class MqttUserManagement(mqtt_client.Client):
     def __init__(
@@ -37,6 +43,7 @@ class MqttUserManagement(mqtt_client.Client):
         self.port = port
         self.qos = qos
         self.delay = delay
+        self.main_topic = topic
         self.users_topic = topic + "/" + "UserManagement"
         self.reply_topic = None
         self.my_id_topic = self.users_topic + "/" + str(self.session.user_id)
@@ -53,15 +60,20 @@ class MqttUserManagement(mqtt_client.Client):
         self.disconnect()
 
     def on_message(self, client, data, msg):
+        json_msg = ""
+        if len(msg.payload) >= len(SINGLE_PUBLISH_HEADER) and msg.payload[: len(SINGLE_PUBLISH_HEADER)] == SINGLE_PUBLISH_HEADER:
+            msg.payload = msg.payload[len(SINGLE_PUBLISH_HEADER):]
+        
         try:
-            json_msg = json.loads(msg.payload)
+            json_msg = json.loads(msg.payload,cls=UserDecoder)
         except Exception:
             return
         sender_id = get_sender_id(json_msg)
 
         if sender_id == self.session.user_id:
             return
-
+        
+        print(json_msg)
         if msg.topic == self.reply_topic:
             self.handle_reply(json_msg)
         elif msg.topic == self.my_id_topic:
@@ -69,10 +81,80 @@ class MqttUserManagement(mqtt_client.Client):
         elif msg.topic == self.users_topic:
             self.handle_general(json_msg)
 
+    @classmethod
+    def handshake(cls, name, topic, broker):
+        retries = 0
+
+        while retries < 5:
+            response = cls._handshake_helper(name, topic + "/" + "UserManagement", broker)
+            if response == None:
+                # show message
+                resp = tk.messagebox.askyesno(
+                    master=get_workbench(),
+                    title="Join Attempt Failed",
+                    message="Failed to connect to session host. Do you want to try again?",
+                )
+                if resp == "no":
+                    break
+            else:
+                return response
+            retries += 1
+
+        return None
+
+    @classmethod
+    def _handshake_helper(cls, name, topic, broker):
+
+        my_id = random.randint(-1000, -1)
+        reply_url = str(uuid.uuid4())
+
+        greeting = {
+            "id": my_id,
+            "instr": {"type": "join",
+                      "name": name,
+                      "reply": reply_url,
+                      "time": time.time()},
+        }
+
+        mqttc.MqttConnection.single_publish(
+            topic, payload=json.dumps(greeting), hostname=broker
+        )
+        payload = mqttc.MqttConnection.single_subscribe(
+            topic + "/" + reply_url, hostname=broker, timeout=HANDSHAKE_TIMEOUT_SEC
+        )
+        response = json.loads(payload, cls=UserDecoder)
+        return response
+
+    def respond_to_handshake(self, sender_id, reply_url, name):
+        assigned_id = self.session.get_new_user_id()
+
+        def get_unique_name(_name):
+            name_list = [user.name for user in self.session.get_active_users(False)]
+            if _name not in name_list:
+                return _name
+
+            else:
+                return "%s (%d)" % (_name, assigned_id)
+
+        message = {
+            "id": self.session.user_id,
+            "name": get_unique_name(name),
+            "id_assigned": assigned_id,
+            "docs": self.session.get_docs(),
+            "users": self.session.get_active_users(False),
+        }
+        mqttc.MqttConnection.single_publish(
+            self.users_topic + "/" + reply_url,
+            payload=json.dumps(message, cls=UserEncoder),
+            hostname=self.broker,
+        )
+
     def handle_reply(self, json_msg):
         message = ""
-        if json_msg["approved"]:
-            if json_msg["type"] == "request_control":
+        instr = get_instr(json_msg)
+        print(json_msg)
+        if instr["approved"]:
+            if instr["type"] == "request_control":
                 self.session.change_host(self.session.user_id)
             else:
                 self.session.change_host(json_msg["id"])
@@ -89,33 +171,42 @@ class MqttUserManagement(mqtt_client.Client):
 
     def handle_addressed(self, json_msg):
         approve = False
-        if json_msg["type"] == "request_control":
+
+        instr = get_instr(json_msg)
+        if self.session.is_host and instr["type"] == "success":
+            user = instr["user"]
+            self.session.add_user_host(user)
+
+        if instr["type"] == "request_control":
             approve = tk.messagebox.askokcancel(
                 parent=get_workbench(),
                 title="Control Request",
-                message="Make " + json_msg["name"] + " host?",
+                message="Make " + instr["name"] + " host?",
             )  # add a timeout on this?
             self.respond_to_request(json_msg, approve)
 
-        if json_msg["type"] == "request_give":
+        if instr["type"] == "request_give":
             approve = tk.messagebox.askokcancel(
                 parent=get_workbench(),
                 title="Control Request",
-                message="Accept host-handoff from " + json_msg["name"] + "?",
+                message="Accept host-handoff from " + instr["name"] + "?",
             )  # add a timeout on this?
             self.respond_to_give(json_msg, approve)
 
         if approve:
             self.session.change_host(
                 self.session.user_id
-                if json_msg["type"] == "request_give"
+                if instr["type"] == "request_give"
                 else json_msg["id"]
             )
 
     def handle_general(self, json_msg):
-        if json_msg["type"] == "leave":
+        instr = get_instr(json_msg)
+        if instr["type"] == "join" and self.session.is_host:
+            self.respond_to_handshake(get_sender_id(json_msg), instr["reply"], instr["name"])
+        elif instr["type"] == "leave":
             self.session.remote_leave(json_msg)
-        elif json_msg["type"] == "end":
+        elif instr["type"] == "end":
             self.session.remote_end(json_msg)
 
     def request_give(self, targetID):
@@ -126,9 +217,11 @@ class MqttUserManagement(mqtt_client.Client):
         self.reply_topic = self.users_topic + "/" + str(uuid.uuid4())
         request = {
             "id": self.session.user_id,
-            "name": self.session.username,
-            "reply": self.reply_topic,
-            "type": "request_give",
+            "instr": {"type": "request_give",
+                      "name": self.session.username,
+                      "reply": self.reply_topic,
+                      "time": time.time()
+                    }
         }
         mqtt_client.Client.subscribe(self, self.reply_topic, qos=self.qos)
         mqttc.MqttConnection.single_publish(
@@ -138,11 +231,11 @@ class MqttUserManagement(mqtt_client.Client):
     def respond_to_give(self, json_msg, approved):
         response = {
             "id": self.session.user_id,
-            "approved": approved,
-            "type": "request_give",
+            "instr": {"type": "request_give", "approved": approved}
         }
+        instr = get_instr(json_msg)
         mqttc.MqttConnection.single_publish(
-            json_msg["reply"], json.dumps(response), self.broker
+            instr["reply"], json.dumps(response), self.broker
         )
 
     def request_control(self):
@@ -152,11 +245,14 @@ class MqttUserManagement(mqtt_client.Client):
         if self.reply_topic:  # cleanup
             mqtt_client.Client.unsubscribe(self, self.reply_topic)
         self.reply_topic = self.users_topic + "/" + str(uuid.uuid4())
+
         request = {
             "id": self.session.user_id,
-            "name": self.session.username,
-            "reply": self.reply_topic,
-            "type": "request_control",
+            "instr": {"name": self.session.username, 
+                      "type": "request_control",
+                      "reply": self.reply_topic,
+                      "time": time.time()
+                    }
         }
 
         mqtt_client.Client.subscribe(self, self.reply_topic, qos=self.qos)
@@ -167,33 +263,47 @@ class MqttUserManagement(mqtt_client.Client):
     def respond_to_request(self, json_msg, approved):
         response = {
             "id": self.session.user_id,
-            "approved": approved,
-            "type": "request_control",
+            "instr": {"type": "request_control", "approved": approved}
         }
+        instr = get_instr(json_msg)
         mqtt_publish.single(
-            json_msg["reply"], payload=json.dumps(response), hostname=self.broker
+            instr["reply"], payload=json.dumps(response), hostname=self.broker
         )
 
     def announce_leave(self):
-        instr = dict()
+        leave = {
+            "id": self.session.user_id,
+            "instr": {"type": "leave", "new_host": None}
+        }
 
-        instr["type"] = "leave"
-        instr["id"] = self.session.user_id
         if self.session.is_host:
-            instr["new_host"] = self.session.nominate_host()
+            leave["instr"]["new_host"] = self.session.nominate_host()
         mqttc.MqttConnection.single_publish(
-            self.users_topic, json.dumps(instr), self.broker
+            self.users_topic, json.dumps(leave), self.broker
         )
 
     def announce_end(self):
         if not self.session.is_host:
             raise ValueError("Only hosts are allowed to end sessions")
+        end = {
+            "id": self.session.user_id,
+            "instr": {"type": "end"}
+        }
+        mqttc.MqttConnection.single_publish(
+            self.users_topic, json.dumps(end), self.broker
+        )
 
+    def announce_active(self): #FIX to new formatted json
         instr = dict()
 
-        instr["type"] = "end"
+        instr["type"] = "A"
         instr["id"] = self.session.user_id
+        instr["is_host"] = self.session.is_host
 
-        mqttc.MqttConnection.single_publish(
-            self.users_topic, json.dumps(instr), self.broker
-        )
+        mqttc.MqttConnection.single_publish(self.users_topic, instr, self.broker)
+        if self.session.is_host:
+            self.announce_host()
+
+    def announce_host(self):
+        instr = "codelive-active"  # replace with a unique hash
+        mqttc.MqttConnection.single_publish(self.users_topic, instr, self.broker)

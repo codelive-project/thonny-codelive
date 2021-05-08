@@ -33,6 +33,12 @@ class TextSpin(ttk.Frame):
             self.text.pack(side=tk.TOP, fill=tk.X, expand=True)
         else:
             self.option_box.pack(side=tk.TOP, fill=tk.X, expand=True)
+        
+        self.text.bind("<<Modified>>", self._on_value_change)
+        self.option_val.trace("w", self._on_value_change)
+
+    def _on_value_change(self, event = None, *args, **kwargs):
+        self.event_generate("<<ValueChanged>>")
 
     def mode(self, mode=None):
         if mode == None:
