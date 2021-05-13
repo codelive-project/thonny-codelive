@@ -90,7 +90,6 @@ class Session:
         self._defualt_delete = None
 
         self.replace_insert_delete()
-        self._add_self(is_host)
 
         self._blink_id = None
         self._pos_sync_after_id = None
@@ -99,7 +98,7 @@ class Session:
         else:
             self.disable_editing()
             # self.enable_cursor_blink()
-
+        self._add_self(is_host)
         self.dialog = SessionDialog(WORKBENCH, self)
 
     @classmethod
@@ -272,6 +271,7 @@ class Session:
                 "id": self.user_id,
                 "instr": {"type": "success", "user": me},
             }
+            print("Topic : %s" % self._connection.topic + "/" + "UserManagement"+ "/" + str(self.get_driver()[0]))
             cmqtt.MqttConnection.single_publish(
                 self._connection.topic + "/" + "UserManagement"+ "/" + str(self.get_driver()[0]),
                 json.dumps(success_message, cls=UserEncoder),
